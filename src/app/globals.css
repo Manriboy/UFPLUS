@@ -1,0 +1,125 @@
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-primary: #941914;
+    --brand-secondary: #4B4B4B;
+    --brand-white: #FFFFFF;
+    --brand-surface: #F6F6F6;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-[#1A1A1A];
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-primary text-white font-medium rounded-none transition-all duration-200 hover:bg-brand-primary-dark hover:shadow-lg active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 border border-brand-primary text-brand-primary font-medium rounded-none transition-all duration-200 hover:bg-brand-primary hover:text-white active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-brand-secondary font-medium rounded-none transition-all duration-200 hover:text-brand-primary hover:bg-brand-surface focus:outline-none;
+  }
+
+  .section-heading {
+    @apply font-display text-3xl md:text-4xl lg:text-5xl font-bold text-[#1A1A1A] leading-tight;
+  }
+
+  .section-subheading {
+    @apply text-brand-secondary text-lg md:text-xl leading-relaxed;
+  }
+
+  .container-section {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 border border-gray-200 bg-white text-brand-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all duration-200;
+  }
+
+  .input-error {
+    @apply border-red-400 focus:ring-red-400;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-green {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-blue {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+
+  .badge-amber {
+    @apply badge bg-amber-100 text-amber-800;
+  }
+
+  .badge-red {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  .badge-gray {
+    @apply badge bg-gray-100 text-gray-600;
+  }
+
+  /* Admin sidebar */
+  .admin-nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-600 rounded-md transition-all duration-150 hover:bg-brand-surface hover:text-brand-primary;
+  }
+
+  .admin-nav-link.active {
+    @apply bg-red-50 text-brand-primary;
+  }
+
+  /* Prose content */
+  .prose-brand p {
+    @apply text-brand-secondary leading-relaxed mb-4;
+  }
+
+  .prose-brand h3 {
+    @apply font-display text-xl font-semibold text-brand-text mb-2 mt-6;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #941914 #f6f6f6;
+  }
+
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+  .animate-delay-500 { animation-delay: 500ms; }
+  .animate-delay-600 { animation-delay: 600ms; }
+
+  .opacity-0-init { opacity: 0; }
+}
