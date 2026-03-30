@@ -1,5 +1,6 @@
 // src/app/admin/leads/page.tsx
 import { Metadata } from 'next'
+import { Prisma, LeadStatus } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { LEAD_STATUS_LABELS } from '@/lib/utils'
 import { Inbox, Mail, Phone, Calendar, Building2 } from 'lucide-react'
@@ -17,9 +18,15 @@ const STATUS_COLORS: Record<string, string> = {
   CLOSED: 'bg-gray-100 text-gray-600 border-gray-200',
 }
 
+function isValidLeadStatus(value: string): value is LeadStatus {
+  return Object.values(LeadStatus).includes(value as LeadStatus)
+}
+
 async function getLeads(status?: string, page = 1) {
   const limit = 20
-  const where = status ? { status } : {}
+
+  const where: Prisma.LeadWhereInput =
+    typeof status === 'string' && isValidLeadStatus(status) ? { status } : {}
 
   const [leads, total] = await Promise.all([
     prisma.lead.findMany({
@@ -52,7 +59,9 @@ export default async function AdminLeadsPage({ searchParams }: Props) {
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-display font-bold text-brand-text">Leads y Consultas</h1>
-        <p className="text-sm text-gray-500 mt-1">{total} consulta{total !== 1 ? 's' : ''} en total</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {total} consulta{total !== 1 ? 's' : ''} en total
+        </p>
       </div>
 
       {/* Filter tabs */}
@@ -145,7 +154,9 @@ export default async function AdminLeadsPage({ searchParams }: Props) {
                     })}
                   </div>
                   <a
-                    href={`mailto:${lead.email}?subject=Consulta UFPlus${lead.project ? ` - ${lead.project.name}` : ''}`}
+                    href={`mailto:${lead.email}?subject=Consulta UFPlus${
+                      lead.project ? ` - ${lead.project.name}` : ''
+                    }`}
                     className="text-xs px-3 py-1.5 bg-brand-primary text-white hover:bg-brand-primary-dark transition-colors rounded"
                   >
                     Responder
