@@ -15,13 +15,11 @@ import {
   ArrowRight,
   CheckCircle,
   Building2,
-  ChevronRight,
   Quote,
 } from 'lucide-react'
-import { formatPrice, DELIVERY_TYPE_LABELS } from '@/lib/utils'
 
 export const metadata: Metadata = {
-  title: 'UFPlus | Tu socio en inversiones inmobiliarias en Chile',
+  title: 'UFPLUS | Tu socio de inversiones inmobiliarias en Chile',
   description:
     'Maximiza tu patrimonio con departamentos de inversión seleccionados por expertos. Asesoría personalizada, proyectos de alta plusvalía en Chile.',
 }
@@ -30,9 +28,17 @@ async function getFeaturedProjects() {
   return prisma.project.findMany({
     where: { isActive: true, isArchived: false, isFeatured: true },
     select: {
-      id: true, name: true, slug: true, commune: true, city: true,
-      priceFrom: true, currency: true, deliveryType: true,
-      shortDescription: true, isFeatured: true, isActive: true,
+      id: true,
+      name: true,
+      slug: true,
+      commune: true,
+      city: true,
+      priceFrom: true,
+      currency: true,
+      deliveryType: true,
+      shortDescription: true,
+      isFeatured: true,
+      isActive: true,
       images: { where: { isMain: true }, take: 1, select: { url: true, alt: true } },
       typologies: { select: { name: true }, orderBy: { sortOrder: 'asc' } },
     },
@@ -52,32 +58,38 @@ const benefits = [
   {
     icon: TrendingUp,
     title: 'Alta plusvalía',
-    description: 'Seleccionamos proyectos en zonas con mayor proyección de crecimiento del mercado inmobiliario.',
+    description:
+      'Seleccionamos proyectos en zonas con mayor proyección de crecimiento del mercado inmobiliario.',
   },
   {
     icon: Shield,
     title: 'Inversión segura',
-    description: 'Trabajamos solo con desarrolladoras con sólida trayectoria y proyectos con promesa y escritura real.',
+    description:
+      'Trabajamos solo con desarrolladoras con sólida trayectoria y proyectos con promesa y escritura real.',
   },
   {
     icon: Banknote,
     title: 'Rentabilidad real',
-    description: 'Te mostramos la proyección de renta, plusvalía y retorno neto de cada oportunidad.',
+    description:
+      'Te mostramos la proyección de renta, plusvalía y retorno neto de cada oportunidad.',
   },
   {
     icon: Users,
     title: 'Acompañamiento experto',
-    description: 'Desde la evaluación hasta la escritura, te acompañamos en cada etapa del proceso.',
+    description:
+      'Desde la evaluación hasta la escritura, te acompañamos en cada etapa del proceso.',
   },
   {
     icon: Search,
     title: 'Selección rigurosa',
-    description: 'Analizamos decenas de proyectos para presentarte solo las mejores oportunidades.',
+    description:
+      'Analizamos decenas de proyectos para presentarte solo las mejores oportunidades.',
   },
   {
     icon: Building2,
     title: 'Apoyo en financiamiento',
-    description: 'Te orientamos en el mejor esquema de financiamiento según tu perfil y capital disponible.',
+    description:
+      'Te orientamos en el mejor esquema de financiamiento según tu perfil y capital disponible.',
   },
 ]
 
@@ -85,22 +97,26 @@ const services = [
   {
     number: '01',
     title: 'Asesoría de inversión',
-    description: 'Analizamos tu perfil, objetivos y capital para identificar la oportunidad ideal para ti.',
+    description:
+      'Analizamos tu perfil, objetivos y capital para identificar la oportunidad ideal para ti.',
   },
   {
     number: '02',
     title: 'Evaluación de proyectos',
-    description: 'Revisamos ubicación, constructora, precio, renta estimada y plusvalía proyectada.',
+    description:
+      'Revisamos ubicación, constructora, precio, renta estimada y plusvalía proyectada.',
   },
   {
     number: '03',
     title: 'Apoyo en financiamiento',
-    description: 'Te orientamos con bancos, subsidios, y estructuras de pie para optimizar tu inversión.',
+    description:
+      'Te orientamos con bancos, subsidios, y estructuras de pie para optimizar tu inversión.',
   },
   {
     number: '04',
     title: 'Acompañamiento total',
-    description: 'Coordinamos promesa, escritura y entrega. Estamos contigo hasta que llaves en mano.',
+    description:
+      'Coordinamos promesa, escritura y entrega. Estamos contigo hasta que llaves en mano.',
   },
 ]
 
@@ -126,10 +142,7 @@ const testimonials = [
 ]
 
 export default async function HomePage() {
-  const [featuredProjects, allProjects] = await Promise.all([
-    getFeaturedProjects(),
-    getAllActiveProjects(),
-  ])
+  const [featuredProjects] = await Promise.all([getFeaturedProjects(), getAllActiveProjects()])
 
   return (
     <>
@@ -168,7 +181,8 @@ export default async function HomePage() {
             </h1>
 
             <p className="text-gray-300 text-lg sm:text-xl leading-relaxed mb-10 max-w-xl animate-slide-up animate-delay-200">
-              Maximiza tu patrimonio con departamentos de alta plusvalía en Chile. Selección experta, asesoría personalizada y acompañamiento total.
+              Maximiza tu patrimonio con departamentos de alta plusvalía en Chile.
+              Selección experta, asesoría personalizada y acompañamiento total.
             </p>
 
             {/* CTAs */}
@@ -223,7 +237,8 @@ export default async function HomePage() {
               La forma más inteligente de invertir en bienes raíces
             </h2>
             <p className="section-subheading">
-              No vendemos departamentos. Te ayudamos a construir patrimonio con decisiones de inversión bien fundamentadas.
+              No vendemos departamentos. Te ayudamos a construir patrimonio con decisiones de
+              inversión bien fundamentadas.
             </p>
           </div>
 
@@ -264,9 +279,7 @@ export default async function HomePage() {
                     Oportunidades seleccionadas
                   </span>
                 </div>
-                <h2 className="section-heading">
-                  Proyectos destacados
-                </h2>
+                <h2 className="section-heading">Proyectos destacados</h2>
               </div>
               <Link
                 href="/proyectos"
@@ -300,7 +313,8 @@ export default async function HomePage() {
                 Cómo te acompañamos en tu inversión
               </h2>
               <p className="section-subheading mb-8">
-                Desde la primera consulta hasta la entrega del departamento, estamos contigo en cada paso del camino.
+                Desde la primera consulta hasta la entrega del departamento, estamos contigo en
+                cada paso del camino.
               </p>
               <Link href="/#contacto" className="btn-primary">
                 Comienza ahora <ArrowRight className="w-4 h-4" />
@@ -342,7 +356,8 @@ export default async function HomePage() {
                 ¿Listo para hacer crecer tu patrimonio?
               </h2>
               <p className="text-white/80">
-                Agenda una reunión sin costo y te mostramos las mejores oportunidades según tu perfil.
+                Agenda una reunión sin costo y te mostramos las mejores oportunidades según tu
+                perfil.
               </p>
             </div>
             <div className="flex gap-4">
@@ -375,10 +390,13 @@ export default async function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {testimonials.map((testimonial, i) => (
-              <div key={i} className="bg-white/5 p-8 border border-white/10 hover:border-brand-primary/30 transition-colors">
+              <div
+                key={i}
+                className="bg-white/5 p-8 border border-white/10 hover:border-brand-primary/30 transition-colors"
+              >
                 <Quote className="w-8 h-8 text-brand-primary/40 mb-4" />
                 <p className="text-gray-300 text-sm leading-relaxed mb-6 italic">
-                  "{testimonial.text}"
+                  &quot;{testimonial.text}&quot;
                 </p>
                 <div className="flex items-center gap-1 mb-3">
                   {Array.from({ length: testimonial.rating }).map((_, i) => (
@@ -407,11 +425,10 @@ export default async function HomePage() {
                   Contacto
                 </span>
               </div>
-              <h2 className="section-heading mb-4">
-                Agenda tu asesoría gratuita
-              </h2>
+              <h2 className="section-heading mb-4">Agenda tu asesoría gratuita</h2>
               <p className="section-subheading mb-8">
-                Cuéntanos tu situación y objetivos. Un asesor especializado te contactará en menos de 24 horas para orientarte sin compromiso.
+                Cuéntanos tu situación y objetivos. Un asesor especializado te contactará en menos
+                de 24 horas para orientarte sin compromiso.
               </p>
 
               <div className="space-y-4">
