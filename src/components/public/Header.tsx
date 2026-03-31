@@ -2,6 +2,7 @@
 // src/components/public/Header.tsx
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Menu, X, Phone } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -35,25 +36,22 @@ export default function Header() {
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
         isScrolled
           ? 'bg-white shadow-md py-3'
-          : 'bg-white/95 backdrop-blur-sm py-4 border-b border-gray-100'
+          : 'bg-transparent py-4'
       )}
     >
       <div className="container-section">
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex items-center">
-              <span className="font-display text-2xl font-bold text-brand-primary tracking-tight">
-                UF
-              </span>
-              <span className="font-display text-2xl font-bold text-brand-secondary tracking-tight">
-                Plus
-              </span>
-            </div>
-            <div className="hidden sm:block w-px h-6 bg-gray-200 mx-1" />
-            <span className="hidden sm:block text-xs text-brand-secondary font-medium tracking-wider uppercase">
-              Inversiones
-            </span>
+
+          {/* Logo — blanco sobre fondo oscuro, color al hacer scroll */}
+          <Link href="/" className="flex items-center">
+            <Image
+              src={isScrolled ? '/logos/logo-color.png' : '/logos/logo-blanco.png'}
+              alt="UFPlus Gestión Inmobiliaria"
+              width={120}
+              height={60}
+              className="h-10 w-auto object-contain transition-all duration-300"
+              priority
+            />
           </Link>
 
           {/* Desktop Nav */}
@@ -64,9 +62,13 @@ export default function Header() {
                 href={link.href}
                 className={cn(
                   'px-4 py-2 text-sm font-medium transition-colors duration-150',
-                  pathname === link.href
-                    ? 'text-brand-primary'
-                    : 'text-brand-secondary hover:text-brand-primary'
+                  isScrolled
+                    ? pathname === link.href
+                      ? 'text-brand-primary'
+                      : 'text-brand-secondary hover:text-brand-primary'
+                    : pathname === link.href
+                    ? 'text-white'
+                    : 'text-white/80 hover:text-white'
                 )}
               >
                 {link.label}
@@ -78,10 +80,15 @@ export default function Header() {
           <div className="hidden lg:flex items-center gap-3">
             <a
               href="tel:+56912345678"
-              className="flex items-center gap-2 text-sm text-brand-secondary hover:text-brand-primary transition-colors"
+              className={cn(
+                'flex items-center gap-2 text-sm transition-colors',
+                isScrolled
+                  ? 'text-brand-secondary hover:text-brand-primary'
+                  : 'text-white/80 hover:text-white'
+              )}
             >
               <Phone className="w-4 h-4" />
-              <span>+56 9 1234 5678</span>
+              <span>+56 9 2823 2649</span>
             </a>
             <Link href="/#contacto" className="btn-primary text-sm py-2.5 px-5">
               Asesoría gratuita
@@ -91,7 +98,12 @@ export default function Header() {
           {/* Mobile menu button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="lg:hidden p-2 text-brand-secondary hover:text-brand-primary transition-colors"
+            className={cn(
+              'lg:hidden p-2 transition-colors',
+              isScrolled
+                ? 'text-brand-secondary hover:text-brand-primary'
+                : 'text-white hover:text-white/70'
+            )}
             aria-label="Toggle menu"
           >
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

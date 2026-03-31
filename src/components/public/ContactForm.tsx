@@ -15,6 +15,15 @@ interface ContactFormProps {
   dark?: boolean
 }
 
+const INCOME_OPTIONS = [
+  'Menos de $1.000.000',
+  'Entre $1.000.000 y $1.400.000',
+  'Entre $1.400.000 y $1.800.000',
+  'Entre $1.800.000 y $2.500.000',
+  'Entre $2.500.000 y $3.000.000',
+  'Más de $3.000.000',
+]
+
 export default function ContactForm({
   projectId,
   projectName,
@@ -97,6 +106,7 @@ export default function ContactForm({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <input type="hidden" {...register('projectId')} />
 
+        {/* Nombre */}
         <div>
           <label className={labelClass}>Nombre completo *</label>
           <input
@@ -107,6 +117,7 @@ export default function ContactForm({
           {errors.name && <p className={errorClass}>{errors.name.message}</p>}
         </div>
 
+        {/* Email + Teléfono */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>Email *</label>
@@ -130,22 +141,33 @@ export default function ContactForm({
           </div>
         </div>
 
+        {/* Selector de ingresos */}
+        <div>
+          <label className={labelClass}>¿Cuánto ganas mensualmente? *</label>
+          <select
+            {...register('message')}
+            className={cn(
+              inputClass,
+              'cursor-pointer',
+              errors.message && 'input-error'
+            )}
+            defaultValue=""
+          >
+            <option value="" disabled>Seleccionar rango...</option>
+            {INCOME_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          {errors.message && <p className={errorClass}>{errors.message.message}</p>}
+        </div>
+
         {projectName && (
           <div className={cn('text-xs px-3 py-2', dark ? 'bg-white/10 text-white/70' : 'bg-brand-surface text-brand-secondary')}>
             Consultando por: <strong>{projectName}</strong>
           </div>
         )}
-
-        <div>
-          <label className={labelClass}>Mensaje</label>
-          <textarea
-            {...register('message')}
-            rows={4}
-            placeholder="¿En qué podemos ayudarte? Cuéntanos sobre tu perfil de inversión..."
-            className={cn(inputClass, 'resize-none', errors.message && 'input-error')}
-          />
-          {errors.message && <p className={errorClass}>{errors.message.message}</p>}
-        </div>
 
         {serverError && (
           <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">

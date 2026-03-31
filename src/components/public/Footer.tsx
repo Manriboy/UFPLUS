@@ -111,7 +111,7 @@ export default function Footer() {
                   className="flex items-start gap-3 text-gray-400 hover:text-white text-sm transition-colors"
                 >
                   <Phone className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>+56 9 1234 5678</span>
+                  <span>+56 9 2823 2649</span>
                 </a>
               </li>
               <li>
@@ -120,13 +120,13 @@ export default function Footer() {
                   className="flex items-start gap-3 text-gray-400 hover:text-white text-sm transition-colors"
                 >
                   <Mail className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>contacto@ufplus.cl</span>
+                  <span>jose@ufplus.cl</span>
                 </a>
               </li>
               <li>
                 <div className="flex items-start gap-3 text-gray-400 text-sm">
                   <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>Av. Providencia 1234, Of. 501<br />Providencia, Santiago</span>
+                  <span>La Capitanía 80, Of. 110<br />Las Condes, Santiago</span>
                 </div>
               </li>
             </ul>
@@ -138,7 +138,7 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="container-section py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-gray-500 text-xs">
-            © {currentYear} UFPlus Inversiones SpA. Todos los derechos reservados.
+            © {currentYear} UFPLUS: Inversión, Plusvalía y Soluciones SpA. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <Link href="/privacidad" className="hover:text-gray-300 transition-colors">

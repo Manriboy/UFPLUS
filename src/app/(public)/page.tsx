@@ -169,20 +169,21 @@ export default async function HomePage() {
             <div className="flex items-center gap-3 mb-6 animate-fade-in">
               <div className="w-8 h-px bg-brand-primary" />
               <span className="text-brand-primary text-sm font-medium tracking-widest uppercase">
-                Broker inmobiliario de inversión
+                Tu socio en Inversiones Inmobiliarias
               </span>
             </div>
 
             {/* Heading */}
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.05] mb-6 animate-slide-up">
-              Tu socio en
-              <span className="block text-brand-primary">inversiones</span>
-              inmobiliarias
+              Maximiza tu patrimonio con
+              <span className="block text-brand-primary">inversión inmobiliaria</span>
+              inteligente
             </h1>
 
             <p className="text-gray-300 text-lg sm:text-xl leading-relaxed mb-10 max-w-xl animate-slide-up animate-delay-200">
-              Maximiza tu patrimonio con departamentos de alta plusvalía en Chile.
-              Selección experta, asesoría personalizada y acompañamiento total.
+              En UFPLUS, somos expertos en identificar departamentos que se arrienden siempre.
+              Gracias a una gran cantidad de proyectos en cartera, nos preocupamos por ofrecerte
+              sólo aquellos proyectos en los que nosotros mismos también invertiríamos.
             </p>
 
             {/* CTAs */}
@@ -202,9 +203,9 @@ export default async function HomePage() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 mt-16 pt-16 border-t border-white/10 animate-slide-up animate-delay-500">
               {[
-                { value: '+50', label: 'Proyectos analizados' },
-                { value: '+200', label: 'Clientes asesorados' },
-                { value: '98%', label: 'Clientes satisfechos' },
+                { value: '+100', label: 'Proyectos analizados' },
+                { value: '+15', label: 'Inmobiliarias' },
+                { value: '+15', label: 'Comunas del país' },
               ].map((stat) => (
                 <div key={stat.label}>
                   <p className="font-display text-3xl sm:text-4xl font-bold text-white mb-1">
