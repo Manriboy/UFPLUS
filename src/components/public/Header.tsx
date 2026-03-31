@@ -43,13 +43,13 @@ export default function Header() {
         <div className="flex items-center justify-between">
 
           {/* Logo — blanco sobre fondo oscuro, color al hacer scroll */}
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="flex items-center self-stretch py-1">
             <Image
               src={isScrolled ? '/logos/logo-color.png' : '/logos/logo-blanco.png'}
               alt="UFPlus Gestión Inmobiliaria"
-              width={120}
-              height={60}
-              className="h-10 w-auto object-contain transition-all duration-300"
+              width={240}
+              height={80}
+              className="h-full w-auto max-h-14 object-contain transition-all duration-300"
               priority
             />
           </Link>

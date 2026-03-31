@@ -19,8 +19,9 @@
     @apply text-[#1A1A1A];
   }
 
+  /* Usar font-sans (Geist) en todos los headings — mismo estilo que btn-primary */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight;
+    @apply font-sans tracking-tight;
   }
 }
 
@@ -37,8 +38,9 @@
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-brand-secondary font-medium rounded-none transition-all duration-200 hover:text-brand-primary hover:bg-brand-surface focus:outline-none;
   }
 
+  /* section-heading usa font-sans en vez de font-display */
   .section-heading {
-    @apply font-display text-3xl md:text-4xl lg:text-5xl font-bold text-[#1A1A1A] leading-tight;
+    @apply font-sans text-3xl md:text-4xl lg:text-5xl font-bold text-[#1A1A1A] leading-tight;
   }
 
   .section-subheading {
@@ -100,7 +102,7 @@
   }
 
   .prose-brand h3 {
-    @apply font-display text-xl font-semibold text-brand-text mb-2 mt-6;
+    @apply font-sans text-xl font-semibold text-brand-text mb-2 mt-6;
   }
 }
 

@@ -167,14 +167,14 @@ export default async function HomePage() {
           <div className="max-w-3xl">
             {/* Eyebrow */}
             <div className="flex items-center gap-3 mb-6 animate-fade-in">
-              <div className="w-8 h-px bg-brand-primary" />
-              <span className="text-brand-primary text-sm font-medium tracking-widest uppercase">
+              <div className="w-8 h-px bg-white/50" />
+              <span className="text-white text-sm font-medium tracking-widest uppercase">
                 Tu socio en Inversiones Inmobiliarias
               </span>
             </div>
 
             {/* Heading */}
-            <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.05] mb-6 animate-slide-up">
+            <h1 className="font-sans text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.05] mb-6 animate-slide-up">
               Maximiza tu patrimonio con
               <span className="block text-brand-primary">inversión inmobiliaria</span>
               inteligente
@@ -208,7 +208,7 @@ export default async function HomePage() {
                 { value: '+15', label: 'Comunas del país' },
               ].map((stat) => (
                 <div key={stat.label}>
-                  <p className="font-display text-3xl sm:text-4xl font-bold text-white mb-1">
+                  <p className="font-sans text-3xl sm:text-4xl font-bold text-white mb-1">
                     {stat.value}
                   </p>
                   <p className="text-gray-400 text-sm">{stat.label}</p>
@@ -253,7 +253,7 @@ export default async function HomePage() {
                       <Icon className="w-6 h-6 text-brand-primary group-hover:text-white transition-colors duration-300" />
                     </div>
                     <div>
-                      <h3 className="font-display text-lg font-semibold text-brand-text mb-2">
+                      <h3 className="font-sans text-lg font-semibold text-brand-text mb-2">
                         {benefit.title}
                       </h3>
                       <p className="text-brand-secondary text-sm leading-relaxed">
@@ -329,12 +329,12 @@ export default async function HomePage() {
                   className="flex gap-6 p-6 bg-brand-surface hover:bg-red-50 transition-colors duration-200 group"
                 >
                   <div className="flex-shrink-0">
-                    <span className="font-display text-4xl font-bold text-gray-200 group-hover:text-brand-primary/20 transition-colors leading-none">
+                    <span className="font-sans text-4xl font-bold text-gray-200 group-hover:text-brand-primary/20 transition-colors leading-none">
                       {service.number}
                     </span>
                   </div>
                   <div>
-                    <h3 className="font-display text-lg font-semibold text-brand-text mb-1">
+                    <h3 className="font-sans text-lg font-semibold text-brand-text mb-1">
                       {service.title}
                     </h3>
                     <p className="text-brand-secondary text-sm leading-relaxed">
@@ -353,7 +353,7 @@ export default async function HomePage() {
         <div className="container-section">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8 text-white">
             <div className="max-w-xl">
-              <h2 className="font-display text-3xl font-bold mb-2">
+              <h2 className="font-sans text-3xl font-bold mb-2">
                 ¿Listo para hacer crecer tu patrimonio?
               </h2>
               <p className="text-white/80">
@@ -378,13 +378,13 @@ export default async function HomePage() {
         <div className="container-section">
           <div className="text-center mb-16">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-8 h-px bg-brand-primary" />
-              <span className="text-brand-primary text-sm font-medium tracking-widest uppercase">
+              <div className="w-8 h-px bg-white/40" />
+              <span className="text-white text-sm font-medium tracking-widest uppercase">
                 Testimonios
               </span>
-              <div className="w-8 h-px bg-brand-primary" />
+              <div className="w-8 h-px bg-white/40" />
             </div>
-            <h2 className="font-display text-4xl font-bold text-white mb-3">
+            <h2 className="font-sans text-4xl font-bold text-white mb-3">
               Lo que dicen nuestros clientes
             </h2>
           </div>
