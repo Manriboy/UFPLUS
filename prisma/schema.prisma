@@ -67,52 +67,44 @@ enum Role {
 // ─── PROJECTS ─────────────────────────────────────────
 
 model Project {
-  id          String        @id @default(cuid())
-  // Identifiers
-  name        String
-  slug        String        @unique
-  internalCode String?
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  internalCode  String?
 
-  // Status
-  isActive    Boolean       @default(false)
-  isFeatured  Boolean       @default(false)
-  isArchived  Boolean       @default(false)
-  sortOrder   Int           @default(0)
-  status      ProjectStatus @default(DRAFT)
+  isActive      Boolean       @default(false)
+  isFeatured    Boolean       @default(false)
+  isArchived    Boolean       @default(false)
+  sortOrder     Int           @default(0)
+  status        ProjectStatus @default(DRAFT)
 
-  // Commercial info
-  deliveryType  DeliveryType
-  priceFrom     Float?
-  currency      String        @default("UF")
-  shortDescription String?   @db.Text
-  longDescription  String?   @db.Text
-  ctaText       String?
+  deliveryType    DeliveryType
+  priceFrom       Float?
+  currency        String        @default("UF")
+  shortDescription String?     @db.Text
+  longDescription  String?     @db.Text
+  ctaText         String?
 
-  // Location
-  address       String?
-  commune       String?
-  city          String?
-  region        String?
+  address         String?
+  commune         String?
+  city            String?
+  region          String?
 
-  // SEO
   metaTitle       String?
   metaDescription String?
 
-  // Video
-  videoUrl      String?
-  videoType     VideoType?
+  videoUrl        String?
+  videoType       VideoType?
 
-  // Dates
-  publishedAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  // Relations
-  typologies    Typology[]
-  amenities     ProjectAmenity[]
+  typologies      Typology[]
+  amenities       ProjectAmenity[]
   financingOptions FinancingOption[]
-  images        ProjectImage[]
-  leads         Lead[]
+  images          ProjectImage[]
+  leads           Lead[]
 
   @@index([isActive, isFeatured])
   @@index([slug])
@@ -126,10 +118,10 @@ enum ProjectStatus {
 }
 
 enum DeliveryType {
-  IMMEDIATE     // Entrega inmediata
-  SOON          // Pronta entrega
-  FUTURE        // Entrega futura
-  IN_CONSTRUCTION // En construcción
+  IMMEDIATE
+  SOON
+  FUTURE
+  IN_CONSTRUCTION
 }
 
 enum VideoType {
@@ -141,15 +133,15 @@ enum VideoType {
 // ─── TYPOLOGIES ───────────────────────────────────────
 
 model Typology {
-  id              String   @id @default(cuid())
-  projectId       String
-  name            String   // Studio, 1D/1B, 2D/2B, etc.
-  usefulArea      Float?   // m² útiles
-  totalArea       Float?   // m² totales
-  priceFrom       Float?
-  observations    String?
-  sortOrder       Int      @default(0)
-  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  usefulArea  Float?
+  totalArea   Float?
+  priceFrom   Float?
+  observations String?
+  sortOrder   Int      @default(0)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 // ─── AMENITIES ────────────────────────────────────────
@@ -158,7 +150,7 @@ model ProjectAmenity {
   id        String  @id @default(cuid())
   projectId String
   name      String
-  icon      String? // optional icon name
+  icon      String?
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
@@ -175,30 +167,31 @@ model FinancingOption {
 // ─── IMAGES ───────────────────────────────────────────
 
 model ProjectImage {
-  id          String   @id @default(cuid())
-  projectId   String
-  url         String
-  publicId    String?  // Cloudinary public ID
-  alt         String?
-  isMain      Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  projectId String
+  url       String
+  publicId  String?
+  alt       String?
+  isMain    Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 // ─── LEADS ────────────────────────────────────────────
 
 model Lead {
-  id        String    @id @default(cuid())
-  name      String
-  email     String
-  phone     String?
-  message   String?   @db.Text
-  projectId String?
-  status    LeadStatus @default(NEW)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  id             String     @id @default(cuid())
+  name           String
+  email          String
+  phone          String?
+  message        String?    @db.Text
+  dicomLastYear  String     // ← NUEVO CAMPO
+  projectId      String?
+  status         LeadStatus @default(NEW)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  project        Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
 }
 
 enum LeadStatus {

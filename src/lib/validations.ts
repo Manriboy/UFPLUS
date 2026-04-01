@@ -72,7 +72,12 @@ export const leadSchema = z.object({
       (val) => !val || /^[+\d\s-]{8,}$/.test(val),
       'Teléfono inválido'
     ),
-  message: z.string().optional().nullable(),
+  message: z
+    .string()
+    .min(1, 'Debes seleccionar un rango de ingresos'),
+  dicomLastYear: z.enum(['Sí', 'No'], {
+    errorMap: () => ({ message: 'Debes seleccionar una opción' }),
+  }),
   projectId: z.string().optional().nullable(),
 })
 

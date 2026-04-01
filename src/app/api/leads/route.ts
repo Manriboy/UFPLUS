@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { name, email, phone, message, projectId } = validated.data
+    const { name, email, phone, message, dicomLastYear, projectId } = validated.data
 
     // Verify project exists if provided
     let validProjectId: string | null = null
@@ -33,13 +33,17 @@ export async function POST(req: NextRequest) {
         email,
         phone: phone || null,
         message: message || null,
+        dicomLastYear,
         projectId: validProjectId,
         status: 'NEW',
       },
     })
 
     return NextResponse.json(
-      { message: 'Tu solicitud fue enviada correctamente. Te contactaremos pronto.', id: lead.id },
+      {
+        message: 'Tu solicitud fue enviada correctamente. Te contactaremos pronto.',
+        id: lead.id,
+      },
       { status: 201 }
     )
   } catch (error) {

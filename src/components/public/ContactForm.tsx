@@ -16,8 +16,7 @@ interface ContactFormProps {
 }
 
 const INCOME_OPTIONS = [
-  'Menos de $1.000.000',
-  'Entre $1.000.000 y $1.400.000',
+  'Menos de $1.400.000',
   'Entre $1.400.000 y $1.800.000',
   'Entre $1.800.000 y $2.500.000',
   'Entre $2.500.000 y $3.000.000',
@@ -65,7 +64,10 @@ export default function ContactForm({
     'input-field text-sm',
     dark ? 'bg-white/10 border-white/20 text-white placeholder-white/50 focus:ring-white' : ''
   )
-  const labelClass = cn('block text-sm font-medium mb-1.5', dark ? 'text-white/80' : 'text-brand-secondary')
+  const labelClass = cn(
+    'block text-sm font-medium mb-1.5',
+    dark ? 'text-white/80' : 'text-brand-secondary'
+  )
   const errorClass = 'text-xs text-red-500 mt-1'
 
   if (isSuccess) {
@@ -78,7 +80,10 @@ export default function ContactForm({
         </p>
         <button
           onClick={() => setIsSuccess(false)}
-          className={cn('mt-6 text-sm underline', dark ? 'text-white/70 hover:text-white' : 'text-brand-primary hover:text-brand-primary-dark')}
+          className={cn(
+            'mt-6 text-sm underline',
+            dark ? 'text-white/70 hover:text-white' : 'text-brand-primary hover:text-brand-primary-dark'
+          )}
         >
           Enviar otro mensaje
         </button>
@@ -153,7 +158,9 @@ export default function ContactForm({
             )}
             defaultValue=""
           >
-            <option value="" disabled>Seleccionar rango...</option>
+            <option value="" disabled>
+              Seleccionar rango...
+            </option>
             {INCOME_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -163,8 +170,36 @@ export default function ContactForm({
           {errors.message && <p className={errorClass}>{errors.message.message}</p>}
         </div>
 
+        {/* Dicom último año */}
+        <div>
+          <label className={labelClass}>¿Has estado en Dicom en el último año? *</label>
+          <select
+            {...register('dicomLastYear')}
+            className={cn(
+              inputClass,
+              'cursor-pointer',
+              errors.dicomLastYear && 'input-error'
+            )}
+            defaultValue=""
+          >
+            <option value="" disabled>
+              Seleccionar opción...
+            </option>
+            <option value="Sí">Sí</option>
+            <option value="No">No</option>
+          </select>
+          {errors.dicomLastYear && (
+            <p className={errorClass}>{errors.dicomLastYear.message}</p>
+          )}
+        </div>
+
         {projectName && (
-          <div className={cn('text-xs px-3 py-2', dark ? 'bg-white/10 text-white/70' : 'bg-brand-surface text-brand-secondary')}>
+          <div
+            className={cn(
+              'text-xs px-3 py-2',
+              dark ? 'bg-white/10 text-white/70' : 'bg-brand-surface text-brand-secondary'
+            )}
+          >
             Consultando por: <strong>{projectName}</strong>
           </div>
         )}
@@ -184,9 +219,13 @@ export default function ContactForm({
           )}
         >
           {isSubmitting ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Enviando...
+            </>
           ) : (
-            <><Send className="w-4 h-4" /> Solicitar asesoría gratuita</>
+            <>
+              <Send className="w-4 h-4" /> Solicitar asesoría gratuita
+            </>
           )}
         </button>
 
