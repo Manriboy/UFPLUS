@@ -1,4 +1,4 @@
-// src/app/admin/login/page.tsx
+// src/app/login/page.tsx
 'use client'
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
@@ -9,17 +9,22 @@ import { loginSchema } from '@/lib/validations'
 import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export default function AdminLoginPage() {
+export default function LoginPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
     resolver: zodResolver(loginSchema),
   })
 
   const onSubmit = async (data: any) => {
     setError(null)
+
     const result = await signIn('credentials', {
       email: data.email,
       password: data.password,
@@ -37,7 +42,6 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen bg-brand-surface flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-1 mb-4">
             <span className="font-display text-3xl font-bold text-brand-primary">UF</span>
@@ -105,9 +109,13 @@ export default function AdminLoginPage() {
               className={cn('btn-primary w-full py-3', isSubmitting && 'opacity-70 cursor-not-allowed')}
             >
               {isSubmitting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Ingresando...</>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Ingresando...
+                </>
               ) : (
-                <><LogIn className="w-4 h-4" /> Ingresar al panel</>
+                <>
+                  <LogIn className="w-4 h-4" /> Ingresar al panel
+                </>
               )}
             </button>
           </form>
