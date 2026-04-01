@@ -147,12 +147,12 @@ export default async function HomePage() {
   return (
     <>
       {/* ─── HERO ──────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex items-center overflow-hidden bg-[#0D0D0D]">
+      <section className="relative min-h-[720px] flex items-center overflow-hidden bg-[#0D0D0D]">
         {/* Background image */}
         <div className="absolute inset-0">
           <Image
-            src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1920&q=80"
-            alt="Santiago skyline"
+            src="/images/santiago-hero.jpg"
+            alt="Skyline de Santiago de Chile"
             fill
             className="object-cover opacity-30"
             priority
@@ -199,28 +199,32 @@ export default async function HomePage() {
                 Ver proyectos
               </Link>
             </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-8 mt-16 pt-16 border-t border-white/10 animate-slide-up animate-delay-500">
-              {[
-                { value: '+100', label: 'Proyectos analizados' },
-                { value: '+15', label: 'Inmobiliarias' },
-                { value: '+15', label: 'Comunas del país' },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <p className="font-sans text-3xl sm:text-4xl font-bold text-white mb-1">
-                    {stat.value}
-                  </p>
-                  <p className="text-gray-400 text-sm">{stat.label}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce">
           <div className="w-px h-12 bg-white/30" />
+        </div>
+      </section>
+
+      {/* ─── STATS ─────────────────────────────────────────── */}
+      <section className="bg-[#0D0D0D] py-10">
+        <div className="container-section">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 border-t border-white/10 pt-10">
+            {[
+              { value: '+100', label: 'Proyectos analizados' },
+              { value: '+15', label: 'Inmobiliarias' },
+              { value: '+15', label: 'Comunas del país' },
+            ].map((stat) => (
+              <div key={stat.label}>
+                <p className="font-sans text-3xl sm:text-4xl font-bold text-white mb-1">
+                  {stat.value}
+                </p>
+                <p className="text-gray-400 text-sm">{stat.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
