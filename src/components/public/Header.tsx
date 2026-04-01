@@ -30,11 +30,14 @@ export default function Header() {
     setIsOpen(false)
   }, [pathname])
 
+  // En páginas distintas a la homepage el fondo es blanco, usar siempre estilo oscuro
+  const useDarkStyle = isScrolled || pathname !== '/'
+
   return (
     <header
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
-        isScrolled
+        useDarkStyle
           ? 'bg-white shadow-md py-3'
           : 'bg-transparent py-4'
       )}
@@ -45,7 +48,7 @@ export default function Header() {
           {/* Logo — blanco sobre fondo oscuro, color al hacer scroll */}
           <Link href="/" className="flex items-center self-stretch py-1">
             <Image
-              src={isScrolled ? '/logos/logo-color.png' : '/logos/logo-blanco.png'}
+              src={useDarkStyle ? '/logos/logo-color.png' : '/logos/logo-blanco.png'}
               alt="UFPlus Gestión Inmobiliaria"
               width={240}
               height={80}
@@ -62,7 +65,7 @@ export default function Header() {
                 href={link.href}
                 className={cn(
                   'px-4 py-2 text-sm font-medium transition-colors duration-150',
-                  isScrolled
+                  useDarkStyle
                     ? pathname === link.href
                       ? 'text-brand-primary'
                       : 'text-brand-secondary hover:text-brand-primary'
@@ -82,7 +85,7 @@ export default function Header() {
               href="tel:+56912345678"
               className={cn(
                 'flex items-center gap-2 text-sm transition-colors',
-                isScrolled
+                useDarkStyle
                   ? 'text-brand-secondary hover:text-brand-primary'
                   : 'text-white/80 hover:text-white'
               )}
@@ -100,7 +103,7 @@ export default function Header() {
             onClick={() => setIsOpen(!isOpen)}
             className={cn(
               'lg:hidden p-2 transition-colors',
-              isScrolled
+              useDarkStyle
                 ? 'text-brand-secondary hover:text-brand-primary'
                 : 'text-white hover:text-white/70'
             )}

@@ -1,10 +1,10 @@
 'use client'
 // src/components/admin/ImageManager.tsx
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { useDropzone } from 'react-dropzone'
 import { toast } from '@/components/ui/Toast'
-import { Upload, Trash2, Star, StarOff, Loader2, ImageOff } from 'lucide-react'
+import { Upload, Trash2, Star, Loader2, ImageOff, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ProjectImage {
@@ -25,14 +25,20 @@ export default function ImageManager({ projectId, initialImages }: Props) {
   const [images, setImages] = useState<ProjectImage[]>(initialImages)
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [savingOrder, setSavingOrder] = useState(false)
+  const dragIndexRef = useRef<number | null>(null)
+  const dragOverIndexRef = useRef<number | null>(null)
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return
     setUploading(true)
 
-    for (const file of acceptedFiles) {
+    // Capturamos el largo actual ANTES del loop para evitar stale closure
+    const currentLength = images.length
+
+    for (let i = 0; i < acceptedFiles.length; i++) {
+      const file = acceptedFiles[i]
       try {
-        // Upload to server (which handles Cloudinary or fallback)
         const formData = new FormData()
         formData.append('file', file)
 
@@ -49,8 +55,9 @@ export default function ImageManager({ projectId, initialImages }: Props) {
 
         const { url, publicId } = await uploadRes.json()
 
-        // Save image record
-        const isFirst = images.length === 0
+        // Solo la primera imagen del batch es principal si no hay ninguna aún
+        const isFirst = currentLength === 0 && i === 0
+
         const saveRes = await fetch(`/api/admin/projects/${projectId}/images`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -120,6 +127,52 @@ export default function ImageManager({ projectId, initialImages }: Props) {
     }
   }
 
+  // ─── Drag-and-drop reorder ────────────────────────────────────────────────
+
+  const handleDragStart = (index: number) => {
+    dragIndexRef.current = index
+  }
+
+  const handleDragEnter = (index: number) => {
+    dragOverIndexRef.current = index
+  }
+
+  const handleDragEnd = async () => {
+    const from = dragIndexRef.current
+    const to = dragOverIndexRef.current
+
+    dragIndexRef.current = null
+    dragOverIndexRef.current = null
+
+    if (from === null || to === null || from === to) return
+
+    const reordered = [...images]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+
+    // Asignar sortOrder consecutivo
+    const withOrder = reordered.map((img, i) => ({ ...img, sortOrder: i + 1 }))
+    setImages(withOrder)
+
+    setSavingOrder(true)
+    try {
+      await Promise.all(
+        withOrder.map((img) =>
+          fetch(`/api/admin/projects/${projectId}/images`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageId: img.id, sortOrder: img.sortOrder }),
+          })
+        )
+      )
+      toast('Orden guardado', 'success')
+    } catch {
+      toast('Error al guardar el orden', 'error')
+    } finally {
+      setSavingOrder(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Dropzone */}
@@ -151,58 +204,75 @@ export default function ImageManager({ projectId, initialImages }: Props) {
 
       {/* Image Grid */}
       {images.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {images.map((img) => (
-            <div
-              key={img.id}
-              className={cn(
-                'relative group aspect-[4/3] overflow-hidden border-2 rounded-lg bg-gray-100',
-                img.isMain ? 'border-brand-primary' : 'border-transparent hover:border-gray-300'
-              )}
-            >
-              <Image
-                src={img.url}
-                alt={img.alt || 'Imagen del proyecto'}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-              />
+        <>
+          <p className="text-xs text-gray-400 flex items-center gap-1">
+            <GripVertical className="h-3 w-3" />
+            Arrastra las imágenes para cambiar el orden
+            {savingOrder && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {images.map((img, index) => (
+              <div
+                key={img.id}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragEnter={() => handleDragEnter(index)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => e.preventDefault()}
+                className={cn(
+                  'relative group aspect-[4/3] overflow-hidden border-2 rounded-lg bg-gray-100 cursor-grab active:cursor-grabbing select-none',
+                  img.isMain ? 'border-brand-primary' : 'border-transparent hover:border-gray-300'
+                )}
+              >
+                <Image
+                  src={img.url}
+                  alt={img.alt || 'Imagen del proyecto'}
+                  fill
+                  className="object-cover pointer-events-none"
+                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                />
 
-              {/* Main badge */}
-              {img.isMain && (
-                <div className="absolute top-1.5 left-1.5 bg-brand-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  Principal
+                {/* Grip handle */}
+                <div className="absolute top-1.5 right-1.5 bg-black/40 text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <GripVertical className="h-3.5 w-3.5" />
                 </div>
-              )}
 
-              {/* Actions overlay */}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                {!img.isMain && (
-                  <button
-                    onClick={() => handleSetMain(img.id)}
-                    title="Establecer como principal"
-                    className="p-1.5 bg-white/90 text-amber-600 rounded-full hover:bg-white transition-colors"
-                  >
-                    <Star className="h-4 w-4" />
-                  </button>
-                )}
-                {deletingId === img.id ? (
-                  <div className="p-1.5 bg-white/90 rounded-full">
-                    <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+                {/* Main badge */}
+                {img.isMain && (
+                  <div className="absolute top-1.5 left-1.5 bg-brand-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    Principal
                   </div>
-                ) : (
-                  <button
-                    onClick={() => handleDelete(img.id)}
-                    title="Eliminar imagen"
-                    className="p-1.5 bg-white/90 text-red-600 rounded-full hover:bg-white transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 )}
+
+                {/* Actions overlay */}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center gap-2 pb-3">
+                  {!img.isMain && (
+                    <button
+                      onClick={() => handleSetMain(img.id)}
+                      title="Establecer como principal"
+                      className="p-1.5 bg-white/90 text-amber-600 rounded-full hover:bg-white transition-colors"
+                    >
+                      <Star className="h-4 w-4" />
+                    </button>
+                  )}
+                  {deletingId === img.id ? (
+                    <div className="p-1.5 bg-white/90 rounded-full">
+                      <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleDelete(img.id)}
+                      title="Eliminar imagen"
+                      className="p-1.5 bg-white/90 text-red-600 rounded-full hover:bg-white transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       ) : (
         <div className="flex flex-col items-center justify-center py-8 border border-gray-200 rounded-lg text-gray-400">
           <ImageOff className="h-8 w-8 mb-2" />
@@ -211,7 +281,7 @@ export default function ImageManager({ projectId, initialImages }: Props) {
       )}
 
       <p className="text-xs text-gray-400">
-        {images.length} imagen{images.length !== 1 ? 'es' : ''} · 
+        {images.length} imagen{images.length !== 1 ? 'es' : ''} ·
         Haz clic en la estrella para establecer como imagen principal.
       </p>
     </div>

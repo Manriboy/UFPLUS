@@ -63,6 +63,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+// Revalidar cada 60s para reflejar cambios del admin sin perder SSG
+export const revalidate = 60
+
 export async function generateStaticParams() {
   const projects = await prisma.project.findMany({
     where: { isActive: true, isArchived: false },
