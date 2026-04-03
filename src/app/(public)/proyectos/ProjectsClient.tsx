@@ -58,23 +58,23 @@ export default function ProjectsClient({
 
   return (
     <div className="min-h-screen bg-brand-surface pt-20">
-      {/* Page header */}
-      <div className="bg-[#1A1A1A] py-16">
-        <div className="container-section">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-px bg-brand-primary" />
-            <span className="text-brand-primary text-sm font-medium tracking-widest uppercase">
-              Portafolio
-            </span>
-          </div>
-          <h1 className="font-display text-4xl sm:text-5xl font-bold text-white mb-3">
-            Proyectos de inversión
-          </h1>
-          <p className="text-gray-400 text-lg max-w-xl">
-            Departamentos seleccionados por expertos en las mejores ubicaciones de Chile.
-          </p>
+    {/* Page header */}
+    <div className="bg-[#1A1A1A] py-16">
+      <div className="container-section">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-px bg-white" />
+          <span className="text-white text-sm font-medium tracking-widest uppercase">
+            Portafolio
+          </span>
         </div>
+        <h1 className="font-display text-4xl sm:text-5xl font-bold text-brand-primary mb-3">
+          Proyectos de inversión
+        </h1>
+        <p className="text-gray-400 text-lg max-w-xl">
+          Departamentos seleccionados por expertos en las mejores ubicaciones de Chile.
+        </p>
       </div>
+    </div>
 
       <div className="container-section py-10">
         {/* Search + Filter bar */}

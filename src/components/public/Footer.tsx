@@ -20,7 +20,7 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-3">
               <a
-                href="https://instagram.com/ufplus"
+                href="https://instagram.com/ufplus.cl"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-white/10 hover:bg-brand-primary transition-colors duration-200"
@@ -37,6 +37,8 @@ export default function Footer() {
               >
                 <Linkedin className="w-4 h-4" />
               </a>
+
+              {/*
               <a
                 href="https://facebook.com/ufplus"
                 target="_blank"
@@ -46,6 +48,8 @@ export default function Footer() {
               >
                 <Facebook className="w-4 h-4" />
               </a>
+              */}
+
             </div>
           </div>
 
@@ -110,7 +114,7 @@ export default function Footer() {
                   className="flex items-start gap-3 text-gray-400 hover:text-white text-sm transition-colors"
                 >
                   <Phone className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>+56 9 1234 5678</span>
+                  <span>+56 9 2823 2649</span>
                 </a>
               </li>
               <li>
@@ -123,10 +127,12 @@ export default function Footer() {
                 </a>
               </li>
               <li>
+                {/*
                 <div className="flex items-start gap-3 text-gray-400 text-sm">
                   <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
                   <span>Av. Providencia 1234, Of. 501<br />Providencia, Santiago</span>
                 </div>
+                */}
               </li>
             </ul>
           </div>
@@ -137,7 +143,7 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="container-section py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-gray-500 text-xs">
-            © {currentYear} UFPLUS Inversiones SpA. Todos los derechos reservados.
+            © {currentYear} Inversión, Plusvalía & Soluciones SpA. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <Link href="/privacidad" className="hover:text-gray-300 transition-colors">
