@@ -257,25 +257,25 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Right column */}
           <div className="space-y-6">
-            <div className="bg-[#1A1A1A] text-white p-6 sticky top-24">
-              <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Precio desde</p>
+            <div className="bg-brand-surface text-gray-900 p-6 sticky top-24 border border-gray-200">
+              <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Precio desde</p>
               <p className="font-display text-4xl font-bold text-brand-primary mb-1">
                 {project.priceFrom ? formatPrice(project.priceFrom, project.currency || 'UF') : 'Consultar'}
               </p>
               {project.commune && (
-                <p className="text-gray-400 text-sm flex items-center gap-1.5 mb-6">
+                <p className="text-gray-600 text-sm flex items-center gap-1.5 mb-6">
                   <MapPin className="w-3.5 h-3.5" /> {project.commune}
                 </p>
               )}
-              <div className="space-y-2 mb-6 border-t border-white/10 pt-5">
+              <div className="space-y-2 mb-6 border-t border-gray-200 pt-5">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Entrega</span>
-                  <span className="font-medium">{deliveryLabel}</span>
+                  <span className="text-gray-500">Entrega</span>
+                  <span className="font-medium text-gray-900">{deliveryLabel}</span>
                 </div>
                 {project.typologies.length > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Tipologías</span>
-                    <span className="font-medium">{project.typologies.length} tipos</span>
+                    <span className="text-gray-500">Tipologías</span>
+                    <span className="font-medium text-gray-900">{project.typologies.length} tipos</span>
                   </div>
                 )}
               </div>
