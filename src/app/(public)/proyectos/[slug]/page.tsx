@@ -84,6 +84,10 @@ export default async function ProjectDetailPage({ params }: Props) {
   const deliveryLabel = DELIVERY_TYPE_LABELS[project.deliveryType]
   const deliveryColor = DELIVERY_TYPE_COLORS[project.deliveryType]
   const embedUrl = project.videoUrl ? getEmbedUrl(project.videoUrl, project.videoType) : null
+  const mapAddress = [project.address, project.commune, project.city, project.region].filter(Boolean).join(', ')
+  const mapUrl = mapAddress
+    ? `https://www.google.com/maps?q=${encodeURIComponent(mapAddress)}&output=embed`
+    : null
 
   return (
     <div className="min-h-screen bg-white pt-20">
@@ -300,6 +304,23 @@ export default async function ProjectDetailPage({ params }: Props) {
           </div>
         )}
       </div>
+
+      {mapUrl && (
+        <div className="container-section py-10 border-t border-gray-100">
+          <h2 className="font-display text-xl font-semibold text-brand-text mb-4 flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-brand-primary" /> Ubicación
+          </h2>
+          <div className="relative w-full h-80 sm:h-96">
+            <iframe
+              src={mapUrl}
+              title={`Ubicación de ${project.name}`}
+              className="absolute inset-0 w-full h-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
