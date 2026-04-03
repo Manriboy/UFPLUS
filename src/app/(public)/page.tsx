@@ -211,11 +211,13 @@ export default async function HomePage() {
       {/* ─── STATS ─────────────────────────────────────────── */}
       <section className="bg-[#0D0D0D] py-10">
         <div className="container-section">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 border-t border-white/10 pt-10">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-8 border-t border-white/10 pt-10">
             {[
               { value: '+100', label: 'Proyectos analizados' },
               { value: '+15', label: 'Inmobiliarias' },
-              { value: '+15', label: 'Comunas del país' },
+              { value: '+30', label: 'Comunas' },
+              { value: '+5', label: 'Regiones' },
+              { value: '+150', label: 'Clientes satisfechos' },
             ].map((stat) => (
               <div key={stat.label}>
                 <p className="font-sans text-3xl sm:text-4xl font-bold text-white mb-1">
