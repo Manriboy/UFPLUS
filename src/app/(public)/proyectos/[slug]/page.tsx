@@ -223,7 +223,19 @@ export default async function ProjectDetailPage({ params }: Props) {
 
             {project.amenities.length > 0 && (
               <div>
-                <h2 className="font-display text-xl font-semibold text-brand-text mb-4">Amenities</h2>
+                <h2 className="font-display text-xl font-semibold text-brand-text mb-4 flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-brand-primary shrink-0">
+                    <path d="M5 11a7 7 0 0 1 14 0" />
+                    <line x1="4" y1="11" x2="20" y2="11" />
+                    <line x1="8" y1="8" x2="8" y2="11" />
+                    <line x1="12" y1="7" x2="12" y2="11" />
+                    <line x1="16" y1="8" x2="16" y2="11" />
+                    <line x1="9" y1="11" x2="7" y2="19" />
+                    <line x1="15" y1="11" x2="17" y2="19" />
+                    <line x1="7" y1="16" x2="17" y2="16" />
+                  </svg>
+                  Amenities
+                </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {project.amenities.map((a) => (
                     <div key={a.id} className="flex items-center gap-2.5 p-3 bg-brand-surface">
@@ -240,14 +252,11 @@ export default async function ProjectDetailPage({ params }: Props) {
                 <h2 className="font-display text-xl font-semibold text-brand-text mb-4 flex items-center gap-2">
                   <BadgeDollarSign className="w-5 h-5 text-brand-primary" /> Financiamiento
                 </h2>
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {project.financingOptions.map((f) => (
-                    <div key={f.id} className="flex items-start gap-3 p-4 border border-gray-100 hover:border-brand-primary/30 transition-colors">
-                      <CheckCircle className="w-5 h-5 text-brand-primary shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-brand-text">{f.name}</p>
-                        {f.description && <p className="text-sm text-brand-secondary mt-0.5">{f.description}</p>}
-                      </div>
+                    <div key={f.id} className="flex items-center gap-2.5 p-3 bg-brand-surface">
+                      <CheckCircle className="w-4 h-4 text-brand-primary shrink-0" />
+                      <span className="text-sm text-brand-secondary">{f.name}</span>
                     </div>
                   ))}
                 </div>
