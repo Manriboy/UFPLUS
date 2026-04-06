@@ -1,10 +1,8 @@
 'use client'
+
 // src/components/public/ContactForm.tsx
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { CheckCircle2, Loader2, Send } from 'lucide-react'
-import { leadSchema, LeadFormData } from '@/lib/validations'
+import { useEffect } from 'react'
+import Script from 'next/script'
 import { cn } from '@/lib/utils'
 
 interface ContactFormProps {
@@ -15,14 +13,6 @@ interface ContactFormProps {
   dark?: boolean
 }
 
-const INCOME_OPTIONS = [
-  'Menos de $1.400.000',
-  'Entre $1.400.000 y $1.800.000',
-  'Entre $1.800.000 y $2.500.000',
-  'Entre $2.500.000 y $3.000.000',
-  'Más de $3.000.000',
-]
-
 export default function ContactForm({
   projectId,
   projectName,
@@ -30,73 +20,39 @@ export default function ContactForm({
   subtitle = 'Completa el formulario y un asesor te contactará en menos de 24 horas.',
   dark = false,
 }: ContactFormProps) {
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [serverError, setServerError] = useState<string | null>(null)
+  useEffect(() => {
+    const iframe = document.getElementById(
+      'inline-V0xbgHkruHaTCU9K6R6t'
+    ) as HTMLIFrameElement | null
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<LeadFormData>({
-    resolver: zodResolver(leadSchema),
-    defaultValues: { projectId },
-  })
+    if (!iframe) return
 
-  const onSubmit = async (data: LeadFormData) => {
-    setServerError(null)
-    try {
-      const res = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Error al enviar')
-      setIsSuccess(true)
-      reset()
-    } catch (err: any) {
-      setServerError(err.message || 'Error al enviar el formulario.')
+    if (projectName) {
+      const url = new URL('https://api.leadconnectorhq.com/widget/form/V0xbgHkruHaTCU9K6R6t')
+      url.searchParams.set('projectName', projectName)
+      if (projectId) {
+        url.searchParams.set('projectId', projectId)
+      }
+      iframe.src = url.toString()
     }
-  }
-
-  const inputClass = cn(
-    'input-field text-sm',
-    dark ? 'bg-white/10 border-white/20 text-white placeholder-white/50 focus:ring-white' : ''
-  )
-  const labelClass = cn(
-    'block text-sm font-medium mb-1.5',
-    dark ? 'text-white/80' : 'text-brand-secondary'
-  )
-  const errorClass = 'text-xs text-red-500 mt-1'
-
-  if (isSuccess) {
-    return (
-      <div className={cn('text-center py-12 px-6', dark ? 'text-white' : 'text-brand-text')}>
-        <CheckCircle2 className={cn('w-16 h-16 mx-auto mb-4', dark ? 'text-green-300' : 'text-green-500')} />
-        <h3 className="font-display text-2xl font-bold mb-2">¡Mensaje enviado!</h3>
-        <p className={cn('text-sm', dark ? 'text-white/70' : 'text-brand-secondary')}>
-          Gracias por contactarnos. Un asesor te escribirá pronto.
-        </p>
-        <button
-          onClick={() => setIsSuccess(false)}
-          className={cn(
-            'mt-6 text-sm underline',
-            dark ? 'text-white/70 hover:text-white' : 'text-brand-primary hover:text-brand-primary-dark'
-          )}
-        >
-          Enviar otro mensaje
-        </button>
-      </div>
-    )
-  }
+  }, [projectId, projectName])
 
   return (
     <div>
+      <Script
+        src="https://link.msgsndr.com/js/form_embed.js"
+        strategy="afterInteractive"
+      />
+
       {(title || subtitle) && (
         <div className="mb-6">
           {title && (
-            <h3 className={cn('font-display text-2xl font-bold mb-2', dark ? 'text-white' : 'text-brand-text')}>
+            <h3
+              className={cn(
+                'font-display text-2xl font-bold mb-2',
+                dark ? 'text-white' : 'text-brand-text'
+              )}
+            >
               {title}
             </h3>
           )}
@@ -108,131 +64,41 @@ export default function ContactForm({
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <input type="hidden" {...register('projectId')} />
-
-        {/* Nombre */}
-        <div>
-          <label className={labelClass}>Nombre completo *</label>
-          <input
-            {...register('name')}
-            placeholder="Ej: María González"
-            className={cn(inputClass, errors.name && 'input-error')}
-          />
-          {errors.name && <p className={errorClass}>{errors.name.message}</p>}
-        </div>
-
-        {/* Email + Teléfono */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Email *</label>
-            <input
-              {...register('email')}
-              type="email"
-              placeholder="tu@email.com"
-              className={cn(inputClass, errors.email && 'input-error')}
-            />
-            {errors.email && <p className={errorClass}>{errors.email.message}</p>}
-          </div>
-          <div>
-            <label className={labelClass}>Teléfono</label>
-            <input
-              {...register('phone')}
-              type="tel"
-              placeholder="+56 9 1234 5678"
-              className={cn(inputClass, errors.phone && 'input-error')}
-            />
-            {errors.phone && <p className={errorClass}>{errors.phone.message}</p>}
-          </div>
-        </div>
-
-        {/* Selector de ingresos */}
-        <div>
-          <label className={labelClass}>¿Cuánto ganas mensualmente? *</label>
-          <select
-            {...register('message')}
-            className={cn(
-              inputClass,
-              'cursor-pointer',
-              errors.message && 'input-error'
-            )}
-            defaultValue=""
-          >
-            <option value="" disabled>
-              Seleccionar rango...
-            </option>
-            {INCOME_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          {errors.message && <p className={errorClass}>{errors.message.message}</p>}
-        </div>
-
-        {/* Dicom último año */}
-        <div>
-          <label className={labelClass}>¿Has estado en Dicom en el último año? *</label>
-          <select
-            {...register('dicomLastYear')}
-            className={cn(
-              inputClass,
-              'cursor-pointer',
-              errors.dicomLastYear && 'input-error'
-            )}
-            defaultValue=""
-          >
-            <option value="" disabled>
-              Seleccionar opción...
-            </option>
-            <option value="Sí">Sí</option>
-            <option value="No">No</option>
-          </select>
-          {errors.dicomLastYear && (
-            <p className={errorClass}>{errors.dicomLastYear.message}</p>
-          )}
-        </div>
-
-        {projectName && (
-          <div
-            className={cn(
-              'text-xs px-3 py-2',
-              dark ? 'bg-white/10 text-white/70' : 'bg-brand-surface text-brand-secondary'
-            )}
-          >
-            Consultando por: <strong>{projectName}</strong>
-          </div>
-        )}
-
-        {serverError && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
-            {serverError}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
+      {projectName && (
+        <div
           className={cn(
-            'w-full btn-primary py-3.5 text-sm',
-            isSubmitting && 'opacity-70 cursor-not-allowed'
+            'text-xs px-3 py-2 mb-4',
+            dark ? 'bg-white/10 text-white/70' : 'bg-brand-surface text-brand-secondary'
           )}
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" /> Enviando...
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" /> Solicitar asesoría gratuita
-            </>
-          )}
-        </button>
+          Consultando por: <strong>{projectName}</strong>
+        </div>
+      )}
 
-        <p className={cn('text-xs text-center', dark ? 'text-white/50' : 'text-gray-400')}>
-          Al enviar, aceptas nuestra política de privacidad. Sin spam.
-        </p>
-      </form>
+      <div
+        className={cn(
+          'w-full overflow-hidden rounded-[3px]',
+          dark ? 'bg-white/5' : 'bg-transparent'
+        )}
+      >
+        <iframe
+          src="https://api.leadconnectorhq.com/widget/form/V0xbgHkruHaTCU9K6R6t"
+          style={{ width: '100%', height: '749px', border: 'none', borderRadius: '3px' }}
+          id="inline-V0xbgHkruHaTCU9K6R6t"
+          data-layout='{"id":"INLINE"}'
+          data-trigger-type="alwaysShow"
+          data-trigger-value=""
+          data-activation-type="alwaysActivated"
+          data-activation-value=""
+          data-deactivation-type="neverDeactivate"
+          data-deactivation-value=""
+          data-form-name="Form 0"
+          data-height="749"
+          data-layout-iframe-id="inline-V0xbgHkruHaTCU9K6R6t"
+          data-form-id="V0xbgHkruHaTCU9K6R6t"
+          title="Form 0"
+        />
+      </div>
     </div>
   )
 }
