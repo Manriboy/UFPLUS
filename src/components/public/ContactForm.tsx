@@ -1,7 +1,7 @@
 'use client'
 
 // src/components/public/ContactForm.tsx
-import { useEffect } from 'react'
+import { useMemo } from 'react'
 import Script from 'next/script'
 import { cn } from '@/lib/utils'
 
@@ -20,21 +20,21 @@ export default function ContactForm({
   subtitle = 'Completa el formulario y un asesor te contactará en menos de 24 horas.',
   dark = false,
 }: ContactFormProps) {
-  useEffect(() => {
-    const iframe = document.getElementById(
-      'inline-V0xbgHkruHaTCU9K6R6t'
-    ) as HTMLIFrameElement | null
-
-    if (!iframe) return
+  const iframeSrc = useMemo(() => {
+    const url = new URL('https://api.leadconnectorhq.com/widget/form/V0xbgHkruHaTCU9K6R6t')
 
     if (projectName) {
-      const url = new URL('https://api.leadconnectorhq.com/widget/form/V0xbgHkruHaTCU9K6R6t')
       url.searchParams.set('projectName', projectName)
-      if (projectId) {
-        url.searchParams.set('projectId', projectId)
-      }
-      iframe.src = url.toString()
     }
+
+    if (projectId) {
+      url.searchParams.set('projectId', projectId)
+    }
+
+    // fuerza recarga fresca del iframe para evitar que vuelva con los últimos valores
+    url.searchParams.set('_t', Date.now().toString())
+
+    return url.toString()
   }, [projectId, projectName])
 
   return (
@@ -82,7 +82,8 @@ export default function ContactForm({
         )}
       >
         <iframe
-          src="https://api.leadconnectorhq.com/widget/form/V0xbgHkruHaTCU9K6R6t"
+          key={iframeSrc}
+          src={iframeSrc}
           style={{ width: '100%', height: '749px', border: 'none', borderRadius: '3px' }}
           id="inline-V0xbgHkruHaTCU9K6R6t"
           data-layout='{"id":"INLINE"}'
