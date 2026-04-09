@@ -1,4 +1,5 @@
 // src/app/(public)/proyectos/page.tsx
+export const dynamic = 'force-dynamic'
 import { Metadata } from 'next'
 import ProjectsClient from './ProjectsClient'
 import prisma from '@/lib/prisma'

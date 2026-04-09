@@ -1,4 +1,5 @@
 // src/app/(public)/page.tsx
+export const dynamic = 'force-dynamic'
 import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
