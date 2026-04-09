@@ -63,16 +63,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-// Revalidar cada 60s para reflejar cambios del admin sin perder SSG
+// Renderizado dinámico on-demand con caché de 60s (sin pre-generación de fallbacks)
 export const revalidate = 60
-
-export async function generateStaticParams() {
-  const projects = await prisma.project.findMany({
-    where: { isActive: true, isArchived: false },
-    select: { slug: true },
-  })
-  return projects.map((p) => ({ slug: p.slug }))
-}
+export const dynamicParams = true
 
 export default async function ProjectDetailPage({ params }: Props) {
   const project = await getProject(params.slug)
