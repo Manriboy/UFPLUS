@@ -11,6 +11,7 @@ import {
   Settings,
   ExternalLink,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react'
 
 const nav = [
@@ -32,6 +33,11 @@ const nav = [
     label: 'Leads / Consultas',
     href: '/admin/leads',
     icon: Inbox,
+  },
+  {
+    label: 'Sync de Stock',
+    href: '/admin/stock',
+    icon: RefreshCw,
   },
 ]
 

@@ -100,11 +100,13 @@ model Project {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  typologies      Typology[]
-  amenities       ProjectAmenity[]
+  typologies       Typology[]
+  amenities        ProjectAmenity[]
   financingOptions FinancingOption[]
-  images          ProjectImage[]
-  leads           Lead[]
+  images           ProjectImage[]
+  leads            Lead[]
+  stockSource      StockSource?
+  units            Unit[]
 
   @@index([isActive, isFeatured])
   @@index([slug])
@@ -199,4 +201,86 @@ enum LeadStatus {
   CONTACTED
   QUALIFIED
   CLOSED
+}
+
+// ─── STOCK SYNC ───────────────────────────────────────
+
+model StockSource {
+  id           String    @id @default(cuid())
+  projectId    String    @unique
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  driveFileId  String
+  sheetName    String?
+  fileType     FileType  @default(GOOGLE_SHEETS)
+
+  // JSON: { "numero": "N° Depto", "piso": "Piso", "precioUf": "Precio UF", ... }
+  columnMapper Json      @default("{}")
+
+  isActive     Boolean   @default(true)
+  lastSyncAt   DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  units        Unit[]
+  syncLogs     SyncLog[]
+}
+
+enum FileType {
+  GOOGLE_SHEETS
+  XLSX
+}
+
+model Unit {
+  id            String      @id @default(cuid())
+  stockSourceId String
+  stockSource   StockSource @relation(fields: [stockSourceId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  numero        String
+  piso          Int?
+  orientacion   String?
+  tipologia     String?
+  supInterior   Float?
+  supTerraza    Float?
+  supTotal      Float?
+  precioUf      Float?
+  descuento     Float?
+  bonoPie       Float?
+  precioEstac   Float?
+  precioBodega  Float?
+  disponible    Boolean     @default(true)
+
+  rawData       Json?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([stockSourceId, numero])
+  @@index([projectId, disponible])
+  @@index([projectId, tipologia])
+}
+
+model SyncLog {
+  id            String      @id @default(cuid())
+  stockSourceId String
+  stockSource   StockSource @relation(fields: [stockSourceId], references: [id], onDelete: Cascade)
+
+  status        SyncStatus
+  rowsFound     Int         @default(0)
+  rowsInserted  Int         @default(0)
+  rowsUpdated   Int         @default(0)
+  rowsSkipped   Int         @default(0)
+  errorMessage  String?     @db.Text
+
+  startedAt     DateTime    @default(now())
+  finishedAt    DateTime?
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  ERROR
 }
