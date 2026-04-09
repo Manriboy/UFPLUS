@@ -54,10 +54,16 @@ export interface SyncResult {
 // ─── Google Auth ──────────────────────────────────────
 
 function getGoogleAuth() {
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-  if (!privateKey || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
+  const raw = process.env.GOOGLE_PRIVATE_KEY
+  if (!raw || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
     throw new Error('Missing Google service account credentials in environment')
   }
+  // Vercel puede entregar la key con \n literales o con saltos reales.
+  // Normalizamos ambos casos y eliminamos comillas extras que Vercel a veces agrega.
+  const privateKey = raw
+    .replace(/\\n/g, '\n')   // \n literales → salto real
+    .replace(/\r\n/g, '\n')  // CRLF → LF
+    .replace(/^["']|["']$/g, '') // quitar comillas externas si las hay
   return new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
