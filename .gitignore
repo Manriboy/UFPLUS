@@ -44,3 +44,6 @@ prisma/*.db-journal
 .vscode/
 .idea/
 .env*.local
+
+google-credentials.json
+.env.local
