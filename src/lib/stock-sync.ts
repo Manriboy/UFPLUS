@@ -1,6 +1,4 @@
 // src/lib/stock-sync.ts
-// Stock sync engine: reads from Google Sheets or .xlsx via Google Drive,
-// normalizes rows using the per-project column mapper, and upserts Units in the DB.
 
 import { google } from 'googleapis'
 import ExcelJS from 'exceljs'
@@ -19,10 +17,8 @@ export interface ColumnMapper {
   supTerraza?: string
   supTotal?: string
   precioUf?: string
-  descuento?: string
-  bonoPie?: string
-  precioEstac?: string
-  precioBodega?: string
+  descuento?: string   // solo usado si descuentoIndividual = true
+  bonoPie?: string     // solo usado si bonoPieIndividual = true
   disponible?: string
 }
 
@@ -37,8 +33,6 @@ export interface NormalizedUnit {
   precioUf?: number | null
   descuento?: number | null
   bonoPie?: number | null
-  precioEstac?: number | null
-  precioBodega?: number | null
   disponible: boolean
   rawData: Record<string, unknown>
 }
@@ -54,8 +48,6 @@ export interface SyncResult {
 // ─── Google Auth ──────────────────────────────────────
 
 function getGoogleAuth() {
-  // Preferimos GOOGLE_CREDENTIALS_BASE64: el JSON completo del service account
-  // encodado en base64. Evita todos los problemas de formato de la private key en Vercel.
   const b64 = process.env.GOOGLE_CREDENTIALS_BASE64
   if (b64) {
     const credentials = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))
@@ -68,7 +60,6 @@ function getGoogleAuth() {
     })
   }
 
-  // Fallback: variables individuales (desarrollo local)
   const raw = process.env.GOOGLE_PRIVATE_KEY
   if (!raw || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
     throw new Error('Missing Google service account credentials in environment')
@@ -86,83 +77,114 @@ function getGoogleAuth() {
   })
 }
 
-// ─── Raw row fetchers ─────────────────────────────────
+// ─── ExcelJS cell value extractor ─────────────────────
 
-/**
- * Reads all rows from a Google Sheet tab.
- * Returns an array of objects keyed by header row values.
- */
+function cellToValue(v: ExcelJS.CellValue): unknown {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'object') {
+    if ('result' in v) return (v as ExcelJS.CellFormulaValue).result ?? null
+    if ('richText' in v) return (v as ExcelJS.CellRichTextValue).richText?.map((r) => r.text).join('') ?? null
+    if ('text' in v) return (v as ExcelJS.CellHyperlinkValue).text ?? null
+    if (v instanceof Date) return v.toISOString()
+  }
+  return v
+}
+
+// ─── Header fetchers ──────────────────────────────────
+
+/** Devuelve la lista de encabezados detectados desde la fila indicada */
+export async function fetchHeaders(
+  fileId: string,
+  fileType: 'GOOGLE_SHEETS' | 'XLSX',
+  sheetName?: string | null,
+  headerRow = 1
+): Promise<string[]> {
+  if (fileType === 'GOOGLE_SHEETS') {
+    return fetchSheetsHeaders(fileId, sheetName, headerRow)
+  }
+  return fetchXlsxHeaders(fileId, sheetName, headerRow)
+}
+
+async function fetchSheetsHeaders(
+  fileId: string,
+  sheetName?: string | null,
+  headerRow = 1
+): Promise<string[]> {
+  const auth = getGoogleAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const rowRef = `${headerRow}:${headerRow}`
+  const range = sheetName ? `${sheetName}!${rowRef}` : rowRef
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: fileId, range })
+  return (res.data.values?.[0] ?? [])
+    .map((h) => String(h ?? '').trim())
+    .filter(Boolean)
+}
+
+async function fetchXlsxHeaders(
+  fileId: string,
+  sheetName?: string | null,
+  headerRow = 1
+): Promise<string[]> {
+  const auth = getGoogleAuth()
+  const drive = google.drive({ version: 'v3', auth })
+  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.read(response.data as Readable)
+  const sheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0]
+  if (!sheet) throw new Error(`Hoja "${sheetName ?? 'primera hoja'}" no encontrada`)
+  const row = sheet.getRow(headerRow)
+  const headers: string[] = []
+  row.eachCell((cell) => {
+    const v = String(cellToValue(cell.value) ?? '').trim()
+    if (v) headers.push(v)
+  })
+  return headers
+}
+
+// ─── Row fetchers ─────────────────────────────────────
+
 async function fetchFromGoogleSheets(
   fileId: string,
-  sheetName?: string | null
+  sheetName?: string | null,
+  headerRow = 1
 ): Promise<Record<string, unknown>[]> {
   const auth = getGoogleAuth()
   const sheets = google.sheets({ version: 'v4', auth })
-
   const range = sheetName ? `${sheetName}!A:ZZ` : 'A:ZZ'
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: fileId,
-    range,
-  })
-
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: fileId, range })
   const rows = res.data.values ?? []
-  if (rows.length < 2) return []
-
-  const headers = (rows[0] as string[]).map((h) => String(h ?? '').trim())
-  return rows.slice(1).map((row) => {
+  if (rows.length < headerRow) return []
+  const headers = (rows[headerRow - 1] as string[]).map((h) => String(h ?? '').trim())
+  return rows.slice(headerRow).map((row) => {
     const obj: Record<string, unknown> = {}
-    headers.forEach((h, i) => {
-      obj[h] = (row as unknown[])[i] ?? null
-    })
+    headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? null })
     return obj
   })
 }
 
-/**
- * Downloads a .xlsx file from Drive and reads it with ExcelJS.
- * Returns rows as objects keyed by header row values.
- */
 async function fetchFromXlsx(
   fileId: string,
-  sheetName?: string | null
+  sheetName?: string | null,
+  headerRow = 1
 ): Promise<Record<string, unknown>[]> {
   const auth = getGoogleAuth()
   const drive = google.drive({ version: 'v3', auth })
-
-  const response = await drive.files.get(
-    { fileId, alt: 'media' },
-    { responseType: 'stream' }
-  )
-
+  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.read(response.data as Readable)
-
-  const sheet = sheetName
-    ? workbook.getWorksheet(sheetName)
-    : workbook.worksheets[0]
-
-  if (!sheet) throw new Error(`Sheet "${sheetName ?? 'primera hoja'}" not found in workbook`)
+  const sheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0]
+  if (!sheet) throw new Error(`Hoja "${sheetName ?? 'primera hoja'}" no encontrada`)
 
   const rows: Record<string, unknown>[] = []
   let headers: string[] = []
 
   sheet.eachRow((row, rowNumber) => {
-    const values = row.values as (ExcelJS.CellValue | null)[]
-    // ExcelJS row.values is 1-indexed; slice(1) to make it 0-indexed
-    const cells = values.slice(1).map((v) => {
-      if (v === null || v === undefined) return null
-      if (typeof v === 'object' && 'result' in v) return (v as ExcelJS.CellFormulaValue).result ?? null
-      if (typeof v === 'object' && 'richText' in v) {
-        return (v as ExcelJS.CellRichTextValue).richText?.map((r) => r.text).join('') ?? null
-      }
-      return v
-    })
-
-    if (rowNumber === 1) {
-      headers = cells.map((c) => String(c ?? '').trim())
-    } else {
+    const values = (row.values as ExcelJS.CellValue[]).slice(1).map(cellToValue)
+    if (rowNumber === headerRow) {
+      headers = values.map((c) => String(c ?? '').trim())
+    } else if (rowNumber > headerRow) {
       const obj: Record<string, unknown> = {}
-      headers.forEach((h, i) => { obj[h] = cells[i] ?? null })
+      headers.forEach((h, i) => { obj[h] = values[i] ?? null })
       rows.push(obj)
     }
   })
@@ -170,7 +192,7 @@ async function fetchFromXlsx(
   return rows
 }
 
-// ─── Normalization ─────────────────────────────────────
+// ─── Normalization helpers ─────────────────────────────
 
 function toFloat(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null
@@ -187,13 +209,16 @@ function toInt(v: unknown): number | null {
 function toDisponible(v: unknown): boolean {
   if (v === null || v === undefined) return true
   const s = String(v).toLowerCase().trim()
-  // Available keywords: "disponible", "disp", "d", "true", "1", "si", "sí", "libre"
   return ['disponible', 'disp', 'd', 'true', '1', 'si', 'sí', 'libre', 'available'].includes(s)
 }
 
 function normalizeRow(
   raw: Record<string, unknown>,
-  mapper: ColumnMapper
+  mapper: ColumnMapper,
+  descuentoIndividual: boolean,
+  descuentoValor: number | null,
+  bonoPieIndividual: boolean,
+  bonoPieValor: number | null,
 ): NormalizedUnit | null {
   const get = (field: keyof ColumnMapper) => {
     const col = mapper[field]
@@ -201,7 +226,7 @@ function normalizeRow(
   }
 
   const numero = String(get('numero') ?? '').trim()
-  if (!numero) return null // skip rows without a unit number
+  if (!numero) return null
 
   return {
     numero,
@@ -212,59 +237,41 @@ function normalizeRow(
     supTerraza: toFloat(get('supTerraza')),
     supTotal: toFloat(get('supTotal')),
     precioUf: toFloat(get('precioUf')),
-    descuento: toFloat(get('descuento')),
-    bonoPie: toFloat(get('bonoPie')),
-    precioEstac: toFloat(get('precioEstac')),
-    precioBodega: toFloat(get('precioBodega')),
+    descuento: descuentoIndividual ? toFloat(get('descuento')) : descuentoValor,
+    bonoPie: bonoPieIndividual ? toFloat(get('bonoPie')) : bonoPieValor,
     disponible: toDisponible(get('disponible')),
     rawData: raw,
   }
 }
 
-// ─── Main sync function ───────────────────────────────
+// ─── Main sync ────────────────────────────────────────
 
 export async function syncStock(stockSourceId: string): Promise<SyncResult> {
-  const result: SyncResult = {
-    rowsFound: 0,
-    rowsInserted: 0,
-    rowsUpdated: 0,
-    rowsSkipped: 0,
-    errors: [],
-  }
+  const result: SyncResult = { rowsFound: 0, rowsInserted: 0, rowsUpdated: 0, rowsSkipped: 0, errors: [] }
 
-  const source = await prisma.stockSource.findUnique({
-    where: { id: stockSourceId },
-  })
-  if (!source) throw new Error(`StockSource ${stockSourceId} not found`)
+  const source = await prisma.stockSource.findUnique({ where: { id: stockSourceId } })
+  if (!source) throw new Error(`StockSource ${stockSourceId} no encontrado`)
 
   const mapper = (source.columnMapper ?? {}) as ColumnMapper
-
-  // Create a RUNNING log entry
-  const log = await prisma.syncLog.create({
-    data: {
-      stockSourceId,
-      status: 'RUNNING',
-    },
-  })
+  const log = await prisma.syncLog.create({ data: { stockSourceId, status: 'RUNNING' } })
 
   try {
-    // 1. Fetch raw rows from source
     let rawRows: Record<string, unknown>[]
     if (source.fileType === 'GOOGLE_SHEETS') {
-      rawRows = await fetchFromGoogleSheets(source.driveFileId, source.sheetName)
+      rawRows = await fetchFromGoogleSheets(source.driveFileId, source.sheetName, source.headerRow)
     } else {
-      rawRows = await fetchFromXlsx(source.driveFileId, source.sheetName)
+      rawRows = await fetchFromXlsx(source.driveFileId, source.sheetName, source.headerRow)
     }
 
     result.rowsFound = rawRows.length
 
-    // 2. Normalize and upsert
     for (const raw of rawRows) {
-      const unit = normalizeRow(raw, mapper)
-      if (!unit) {
-        result.rowsSkipped++
-        continue
-      }
+      const unit = normalizeRow(
+        raw, mapper,
+        source.descuentoIndividual, source.descuentoValor,
+        source.bonoPieIndividual, source.bonoPieValor,
+      )
+      if (!unit) { result.rowsSkipped++; continue }
 
       const existing = await prisma.unit.findUnique({
         where: { stockSourceId_numero: { stockSourceId, numero: unit.numero } },
@@ -281,8 +288,6 @@ export async function syncStock(stockSourceId: string): Promise<SyncResult> {
         precioUf: unit.precioUf,
         descuento: unit.descuento,
         bonoPie: unit.bonoPie,
-        precioEstac: unit.precioEstac,
-        precioBodega: unit.precioBodega,
         disponible: unit.disponible,
         rawData: unit.rawData as Prisma.InputJsonValue,
       }
@@ -291,47 +296,22 @@ export async function syncStock(stockSourceId: string): Promise<SyncResult> {
         await prisma.unit.update({ where: { id: existing.id }, data })
         result.rowsUpdated++
       } else {
-        await prisma.unit.create({
-          data: {
-            stockSourceId,
-            numero: unit.numero,
-            ...data,
-          },
-        })
+        await prisma.unit.create({ data: { stockSourceId, numero: unit.numero, ...data } })
         result.rowsInserted++
       }
     }
 
-    // 3. Update log + lastSyncAt
     await prisma.syncLog.update({
       where: { id: log.id },
-      data: {
-        status: 'SUCCESS',
-        rowsFound: result.rowsFound,
-        rowsInserted: result.rowsInserted,
-        rowsUpdated: result.rowsUpdated,
-        rowsSkipped: result.rowsSkipped,
-        finishedAt: new Date(),
-      },
+      data: { status: 'SUCCESS', rowsFound: result.rowsFound, rowsInserted: result.rowsInserted, rowsUpdated: result.rowsUpdated, rowsSkipped: result.rowsSkipped, finishedAt: new Date() },
     })
-    await prisma.stockSource.update({
-      where: { id: stockSourceId },
-      data: { lastSyncAt: new Date() },
-    })
+    await prisma.stockSource.update({ where: { id: stockSourceId }, data: { lastSyncAt: new Date() } })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     result.errors.push(msg)
     await prisma.syncLog.update({
       where: { id: log.id },
-      data: {
-        status: 'ERROR',
-        errorMessage: msg,
-        rowsFound: result.rowsFound,
-        rowsInserted: result.rowsInserted,
-        rowsUpdated: result.rowsUpdated,
-        rowsSkipped: result.rowsSkipped,
-        finishedAt: new Date(),
-      },
+      data: { status: 'ERROR', errorMessage: msg, rowsFound: result.rowsFound, rowsInserted: result.rowsInserted, rowsUpdated: result.rowsUpdated, rowsSkipped: result.rowsSkipped, finishedAt: new Date() },
     })
     throw err
   }
@@ -353,7 +333,6 @@ export interface UnitFilters {
 
 export async function queryUnits(filters: UnitFilters) {
   const where: Prisma.UnitWhereInput = {}
-
   if (filters.projectId) where.projectId = filters.projectId
   if (filters.tipologia) where.tipologia = { contains: filters.tipologia, mode: 'insensitive' }
   if (filters.disponible !== undefined) where.disponible = filters.disponible
@@ -369,7 +348,6 @@ export async function queryUnits(filters: UnitFilters) {
       ...(filters.pisoMax !== undefined ? { lte: filters.pisoMax } : {}),
     }
   }
-
   return prisma.unit.findMany({
     where,
     orderBy: [{ piso: 'asc' }, { numero: 'asc' }],

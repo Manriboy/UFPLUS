@@ -42,7 +42,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { projectId, driveFileId, sheetName, fileType, columnMapper, isActive } = body
+  const {
+    projectId, driveFileId, sheetName, fileType, columnMapper, isActive,
+    headerRow, precioEstacFijo, precioBodegaFijo,
+    descuentoIndividual, descuentoValor, bonoPieIndividual, bonoPieValor,
+  } = body
 
   if (!projectId || !driveFileId) {
     return NextResponse.json(
@@ -59,6 +63,13 @@ export async function POST(req: NextRequest) {
       fileType: fileType ?? 'GOOGLE_SHEETS',
       columnMapper: columnMapper ?? {},
       isActive: isActive ?? true,
+      headerRow: headerRow ?? 1,
+      precioEstacFijo: precioEstacFijo ?? null,
+      precioBodegaFijo: precioBodegaFijo ?? null,
+      descuentoIndividual: descuentoIndividual ?? false,
+      descuentoValor: descuentoValor ?? null,
+      bonoPieIndividual: bonoPieIndividual ?? false,
+      bonoPieValor: bonoPieValor ?? null,
     },
   })
 
@@ -74,7 +85,11 @@ export async function PUT(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
 
   const body = await req.json()
-  const { driveFileId, sheetName, fileType, columnMapper, isActive } = body
+  const {
+    driveFileId, sheetName, fileType, columnMapper, isActive,
+    headerRow, precioEstacFijo, precioBodegaFijo,
+    descuentoIndividual, descuentoValor, bonoPieIndividual, bonoPieValor,
+  } = body
 
   const source = await prisma.stockSource.update({
     where: { id },
@@ -84,6 +99,13 @@ export async function PUT(req: NextRequest) {
       ...(fileType !== undefined && { fileType }),
       ...(columnMapper !== undefined && { columnMapper }),
       ...(isActive !== undefined && { isActive }),
+      ...(headerRow !== undefined && { headerRow }),
+      ...(precioEstacFijo !== undefined && { precioEstacFijo }),
+      ...(precioBodegaFijo !== undefined && { precioBodegaFijo }),
+      ...(descuentoIndividual !== undefined && { descuentoIndividual }),
+      ...(descuentoValor !== undefined && { descuentoValor }),
+      ...(bonoPieIndividual !== undefined && { bonoPieIndividual }),
+      ...(bonoPieValor !== undefined && { bonoPieValor }),
     },
   })
 

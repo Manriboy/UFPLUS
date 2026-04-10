@@ -217,6 +217,21 @@ model StockSource {
   // JSON: { "numero": "N° Depto", "piso": "Piso", "precioUf": "Precio UF", ... }
   columnMapper Json      @default("{}")
 
+  // Fila donde están los encabezados (puede no ser la 1)
+  headerRow    Int       @default(1)
+
+  // Precio fijo de estacionamiento y bodega (aplicado a todas las unidades)
+  precioEstacFijo    Float?
+  precioBodegaFijo   Float?
+
+  // Descuento: si individual=false → valor único para todas; si true → mapeo por columna
+  descuentoIndividual Boolean @default(false)
+  descuentoValor      Float?
+
+  // Bono pie: igual que descuento
+  bonoPieIndividual Boolean @default(false)
+  bonoPieValor      Float?
+
   isActive     Boolean   @default(true)
   lastSyncAt   DateTime?
 
@@ -249,8 +264,6 @@ model Unit {
   precioUf      Float?
   descuento     Float?
   bonoPie       Float?
-  precioEstac   Float?
-  precioBodega  Float?
   disponible    Boolean     @default(true)
 
   rawData       Json?
