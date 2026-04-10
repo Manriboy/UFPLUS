@@ -401,11 +401,22 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
 
 // ─── Units Table ──────────────────────────────────────
 
+type SortKey = 'numero' | 'piso' | 'tipologia' | 'orientacion' | 'supTotal' | 'precioUf' | 'descuento' | 'bonoPie'
+type SortDir = 'asc' | 'desc'
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (col !== sortKey) return <span className="ml-1 text-gray-300">↕</span>
+  return <span className="ml-1 text-brand-primary">{sortDir === 'asc' ? '↑' : '↓'}</span>
+}
+
 function UnitsTable({ projectId }: { projectId: string }) {
   const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDisp, setFilterDisp] = useState<'all' | 'true' | 'false'>('all')
   const [filterTipo, setFilterTipo] = useState('')
+  const [filterOrient, setFilterOrient] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('numero')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   useEffect(() => {
     setLoading(true)
@@ -416,15 +427,40 @@ function UnitsTable({ projectId }: { projectId: string }) {
       .then((d) => { setUnits(d.units ?? []); setLoading(false) })
   }, [projectId, filterDisp])
 
-  const filtered = filterTipo
-    ? units.filter((u) => u.tipologia?.toLowerCase().includes(filterTipo.toLowerCase()))
-    : units
+  function handleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   const tipologias = Array.from(new Set(units.map((u) => u.tipologia).filter((t): t is string => !!t)))
+  const orientaciones = Array.from(new Set(units.map((u) => u.orientacion).filter((o): o is string => !!o)))
+
+  const filtered = units
+    .filter((u) => !filterTipo || u.tipologia?.toLowerCase().includes(filterTipo.toLowerCase()))
+    .filter((u) => !filterOrient || u.orientacion?.toLowerCase() === filterOrient.toLowerCase())
+    .sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey]
+      if (av == null && bv == null) return 0
+      if (av == null) return 1
+      if (bv == null) return -1
+      const cmp = typeof av === 'string' ? av.localeCompare(bv as string, 'es') : (av as number) - (bv as number)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+
+  function Th({ col, label, align = 'left' }: { col: SortKey; label: string; align?: 'left' | 'right' | 'center' }) {
+    return (
+      <th
+        className={cn('px-4 py-2.5 font-medium cursor-pointer select-none hover:text-gray-800 transition-colors', align === 'right' && 'text-right', align === 'center' && 'text-center')}
+        onClick={() => handleSort(col)}
+      >
+        {label}<SortIcon col={col} sortKey={sortKey} sortDir={sortDir} />
+      </th>
+    )
+  }
 
   return (
     <div className="border-t border-gray-100">
-      <div className="flex items-center gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100">
+      <div className="flex items-center gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100 flex-wrap">
         <select value={filterDisp} onChange={(e) => setFilterDisp(e.target.value as 'all' | 'true' | 'false')} className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white text-gray-700">
           <option value="all">Todas</option>
           <option value="true">Disponibles</option>
@@ -433,6 +469,10 @@ function UnitsTable({ projectId }: { projectId: string }) {
         <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white text-gray-700">
           <option value="">Todas las tipologías</option>
           {tipologias.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select value={filterOrient} onChange={(e) => setFilterOrient(e.target.value)} className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white text-gray-700">
+          <option value="">Todas las orientaciones</option>
+          {orientaciones.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} unidades</span>
       </div>
@@ -445,14 +485,14 @@ function UnitsTable({ projectId }: { projectId: string }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-left border-b border-gray-100">
-                <th className="px-4 py-2.5 font-medium">N° Depto</th>
-                <th className="px-4 py-2.5 font-medium">Piso</th>
-                <th className="px-4 py-2.5 font-medium">Tipología</th>
-                <th className="px-4 py-2.5 font-medium">Orientación</th>
-                <th className="px-4 py-2.5 font-medium text-right">Sup. Total m²</th>
-                <th className="px-4 py-2.5 font-medium text-right">Precio UF</th>
-                <th className="px-4 py-2.5 font-medium text-right">Descuento</th>
-                <th className="px-4 py-2.5 font-medium text-right">Bono Pie</th>
+                <Th col="numero" label="N° Depto" />
+                <Th col="piso" label="Piso" />
+                <Th col="tipologia" label="Tipología" />
+                <Th col="orientacion" label="Orientación" />
+                <Th col="supTotal" label="Sup. Total m²" align="right" />
+                <Th col="precioUf" label="Precio UF" align="right" />
+                <Th col="descuento" label="Descuento" align="right" />
+                <Th col="bonoPie" label="Bono Pie" align="right" />
                 <th className="px-4 py-2.5 font-medium text-center">Estado</th>
               </tr>
             </thead>
