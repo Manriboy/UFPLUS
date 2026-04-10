@@ -54,16 +54,26 @@ export interface SyncResult {
 // ─── Google Auth ──────────────────────────────────────
 
 function getGoogleAuth() {
+  // Preferimos GOOGLE_CREDENTIALS_BASE64: el JSON completo del service account
+  // encodado en base64. Evita todos los problemas de formato de la private key en Vercel.
+  const b64 = process.env.GOOGLE_CREDENTIALS_BASE64
+  if (b64) {
+    const credentials = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))
+    return new google.auth.GoogleAuth({
+      credentials,
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+        'https://www.googleapis.com/auth/drive.readonly',
+      ],
+    })
+  }
+
+  // Fallback: variables individuales (desarrollo local)
   const raw = process.env.GOOGLE_PRIVATE_KEY
   if (!raw || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
     throw new Error('Missing Google service account credentials in environment')
   }
-  // Vercel puede entregar la key con \n literales o con saltos reales.
-  // Normalizamos ambos casos y eliminamos comillas extras que Vercel a veces agrega.
-  const privateKey = raw
-    .replace(/\\n/g, '\n')   // \n literales → salto real
-    .replace(/\r\n/g, '\n')  // CRLF → LF
-    .replace(/^["']|["']$/g, '') // quitar comillas externas si las hay
+  const privateKey = raw.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/^["']|["']$/g, '')
   return new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
