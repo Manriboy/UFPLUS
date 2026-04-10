@@ -211,6 +211,9 @@ export default async function ProjectDetailPage({ params }: Props) {
                     </tbody>
                   </table>
                 </div>
+                <p className="mt-2 text-xs text-gray-400 italic">
+                  * Metros cuadrados por tipología son promedio de metros. El precio corresponde a la unidad de menor precio.
+                </p>
               </div>
             )}
 
