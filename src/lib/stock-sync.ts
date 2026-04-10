@@ -246,7 +246,31 @@ async function fetchFromXlsx(
 
 function toFloat(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null
-  const n = parseFloat(String(v).replace(/[^\d.,-]/g, '').replace(',', '.'))
+  const s = String(v).trim()
+
+  // Formato chileno: punto como separador de miles, coma como decimal
+  // Ej: "4.356" = 4356 | "4.356,78" = 4356.78 | "4,5" = 4.5 | "4500" = 4500
+  let normalized: string
+  if (s.includes(',') && s.includes('.')) {
+    // Ambos presentes: punto = miles, coma = decimal
+    normalized = s.replace(/\./g, '').replace(',', '.')
+  } else if (s.includes(',')) {
+    // Solo coma: separador decimal
+    normalized = s.replace(',', '.')
+  } else if (s.includes('.')) {
+    const parts = s.split('.')
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+      // Punto como separador de miles (ej: "4.356" o "1.234.567")
+      normalized = s.replace(/\./g, '')
+    } else {
+      // Punto como decimal (ej: "4.5")
+      normalized = s
+    }
+  } else {
+    normalized = s
+  }
+
+  const n = parseFloat(normalized.replace(/[^\d.-]/g, ''))
   return isNaN(n) ? null : n
 }
 
