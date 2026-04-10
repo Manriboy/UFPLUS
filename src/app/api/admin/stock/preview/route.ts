@@ -1,12 +1,11 @@
 // src/app/api/admin/stock/preview/route.ts
-// Conecta al archivo y devuelve la lista de columnas detectadas en la fila indicada.
 // POST /api/admin/stock/preview
-// Body: { driveFileId, fileType, sheetName?, headerRow? }
+// Conecta al archivo, devuelve columnas detectadas + primeras filas de datos para verificación.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { fetchHeaders } from '@/lib/stock-sync'
+import { fetchHeaders, fetchPreviewRows } from '@/lib/stock-sync'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -19,14 +18,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'driveFileId y fileType son requeridos' }, { status: 400 })
   }
 
+  const row = headerRow ? parseInt(headerRow, 10) : 1
+
   try {
-    const columns = await fetchHeaders(
-      driveFileId,
-      fileType,
-      sheetName || null,
-      headerRow ? parseInt(headerRow, 10) : 1
-    )
-    return NextResponse.json({ columns })
+    const [columns, sampleRows] = await Promise.all([
+      fetchHeaders(driveFileId, fileType, sheetName || null, row),
+      fetchPreviewRows(driveFileId, fileType, sheetName || null, row, 3),
+    ])
+    return NextResponse.json({ columns, sampleRows })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error al conectar con el archivo'
     return NextResponse.json({ error: message }, { status: 500 })

@@ -110,6 +110,7 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState('')
   const [columns, setColumns] = useState<string[]>([])
+  const [sampleRows, setSampleRows] = useState<Record<string, unknown>[]>([])
   const [saving, setSaving] = useState(false)
 
   const [s1, setS1] = useState<Step1Form>({
@@ -143,6 +144,7 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
       const data = await res.json()
       if (!res.ok) { setConnectError(data.error ?? 'Error al conectar'); return }
       setColumns(data.columns ?? [])
+      setSampleRows(data.sampleRows ?? [])
       setStep(2)
     } catch { setConnectError('Error de red') }
     finally { setConnecting(false) }
@@ -226,11 +228,43 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
           {/* ── STEP 2 ── */}
           {step === 2 && (
             <div className="space-y-6">
-              {/* Detected columns info */}
+              {/* Detected columns */}
               <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-                <p className="text-xs font-semibold text-green-800 mb-1">Columnas detectadas ({columns.length})</p>
+                <p className="text-xs font-semibold text-green-800 mb-1">
+                  {columns.length} columnas detectadas en fila {s1.headerRow}
+                </p>
                 <p className="text-xs text-green-700 leading-relaxed">{columns.join(' · ')}</p>
               </div>
+
+              {/* Sample data preview */}
+              {sampleRows.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">Vista previa de datos (primeras {sampleRows.length} filas)</p>
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table className="text-[11px] w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          {columns.map((c) => (
+                            <th key={c} className="px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap">{c}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sampleRows.map((row, i) => (
+                          <tr key={i} className="border-b border-gray-100 last:border-0">
+                            {columns.map((c) => (
+                              <td key={c} className="px-3 py-1.5 text-gray-700 whitespace-nowrap max-w-[120px] truncate">
+                                {row[c] != null ? String(row[c]) : <span className="text-gray-300">—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">Verifica que los datos corresponden a la columna correcta antes de mapear.</p>
+                </div>
+              )}
 
               {/* Standard column mapping */}
               <div>
@@ -251,12 +285,10 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
               <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-800">Descuento</span>
-                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
                     <span className={cn(!s2.descuentoIndividual && 'text-brand-primary font-semibold')}>Grupal</span>
-                    <div className="relative inline-flex">
-                      <input type="checkbox" className="sr-only peer" checked={s2.descuentoIndividual}
-                        onChange={(e) => setS2({ ...s2, descuentoIndividual: e.target.checked })} />
-                      <div className="w-9 h-5 bg-gray-200 peer-checked:bg-brand-primary rounded-full transition-colors cursor-pointer" onClick={() => setS2({ ...s2, descuentoIndividual: !s2.descuentoIndividual })} />
+                    <div className="relative inline-flex cursor-pointer" onClick={() => setS2({ ...s2, descuentoIndividual: !s2.descuentoIndividual })}>
+                      <div className={cn('w-9 h-5 rounded-full transition-colors', s2.descuentoIndividual ? 'bg-brand-primary' : 'bg-gray-200')} />
                       <div className={cn('absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', s2.descuentoIndividual && 'translate-x-4')} />
                     </div>
                     <span className={cn(s2.descuentoIndividual && 'text-brand-primary font-semibold')}>Individual (por columna)</span>
@@ -266,13 +298,15 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-gray-500 w-44 shrink-0">Columna de descuento</span>
                     <ColSelect columns={columns} value={mapper['descuento'] ?? ''} onChange={(v) => setMapper('descuento', v)} placeholder="No mapear" />
+                    <span className="text-xs text-gray-400">%</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-500 w-44 shrink-0">Valor único (UF)</span>
-                    <input type="number" step="0.01" min="0" placeholder="ej: 50"
+                    <span className="text-xs text-gray-500 w-44 shrink-0">Valor único</span>
+                    <input type="number" step="0.1" min="0" max="100" placeholder="ej: 5"
                       value={s2.descuentoValor} onChange={(e) => setS2({ ...s2, descuentoValor: e.target.value })}
                       className="input-field text-sm py-1.5 flex-1" />
+                    <span className="text-xs text-gray-500 font-medium">%</span>
                   </div>
                 )}
               </div>
@@ -281,12 +315,10 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
               <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-800">Bono Pie</span>
-                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
                     <span className={cn(!s2.bonoPieIndividual && 'text-brand-primary font-semibold')}>Grupal</span>
-                    <div className="relative inline-flex">
-                      <input type="checkbox" className="sr-only peer" checked={s2.bonoPieIndividual}
-                        onChange={(e) => setS2({ ...s2, bonoPieIndividual: e.target.checked })} />
-                      <div className="w-9 h-5 bg-gray-200 peer-checked:bg-brand-primary rounded-full transition-colors cursor-pointer" onClick={() => setS2({ ...s2, bonoPieIndividual: !s2.bonoPieIndividual })} />
+                    <div className="relative inline-flex cursor-pointer" onClick={() => setS2({ ...s2, bonoPieIndividual: !s2.bonoPieIndividual })}>
+                      <div className={cn('w-9 h-5 rounded-full transition-colors', s2.bonoPieIndividual ? 'bg-brand-primary' : 'bg-gray-200')} />
                       <div className={cn('absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', s2.bonoPieIndividual && 'translate-x-4')} />
                     </div>
                     <span className={cn(s2.bonoPieIndividual && 'text-brand-primary font-semibold')}>Individual (por columna)</span>
@@ -296,13 +328,15 @@ function SourceWizard({ projects, initial, onSave, onClose }: {
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-gray-500 w-44 shrink-0">Columna de bono pie</span>
                     <ColSelect columns={columns} value={mapper['bonoPie'] ?? ''} onChange={(v) => setMapper('bonoPie', v)} placeholder="No mapear" />
+                    <span className="text-xs text-gray-400">%</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-500 w-44 shrink-0">Valor único (UF)</span>
-                    <input type="number" step="0.01" min="0" placeholder="ej: 100"
+                    <span className="text-xs text-gray-500 w-44 shrink-0">Valor único</span>
+                    <input type="number" step="0.1" min="0" max="100" placeholder="ej: 10"
                       value={s2.bonoPieValor} onChange={(e) => setS2({ ...s2, bonoPieValor: e.target.value })}
                       className="input-field text-sm py-1.5 flex-1" />
+                    <span className="text-xs text-gray-500 font-medium">%</span>
                   </div>
                 )}
               </div>
@@ -431,8 +465,8 @@ function UnitsTable({ projectId }: { projectId: string }) {
                   <td className="px-4 py-2 text-gray-600">{u.orientacion ?? '—'}</td>
                   <td className="px-4 py-2 text-right text-gray-600">{fmtNum(u.supTotal, 1)}</td>
                   <td className="px-4 py-2 text-right font-semibold text-brand-primary">{fmtNum(u.precioUf)} UF</td>
-                  <td className="px-4 py-2 text-right text-gray-600">{u.descuento ? `${fmtNum(u.descuento)} UF` : '—'}</td>
-                  <td className="px-4 py-2 text-right text-gray-600">{u.bonoPie ? `${fmtNum(u.bonoPie)} UF` : '—'}</td>
+                  <td className="px-4 py-2 text-right text-gray-600">{u.descuento ? `${fmtNum(u.descuento, 1)}%` : '—'}</td>
+                  <td className="px-4 py-2 text-right text-gray-600">{u.bonoPie ? `${fmtNum(u.bonoPie, 1)}%` : '—'}</td>
                   <td className="px-4 py-2 text-center">
                     {u.disponible
                       ? <span className="inline-block bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Disponible</span>
@@ -592,13 +626,11 @@ export default function StockPage() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {source._count.units > 0 && (
-                      <button onClick={() => toggle(expandedUnits, setExpandedUnits, source.id)}
-                        className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors', unitsOpen ? 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50')}>
-                        <Table2 className="h-3.5 w-3.5" />
-                        {unitsOpen ? 'Ocultar' : 'Ver unidades'}
-                      </button>
-                    )}
+                    <button onClick={() => toggle(expandedUnits, setExpandedUnits, source.id)}
+                      className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors', unitsOpen ? 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50')}>
+                      <Table2 className="h-3.5 w-3.5" />
+                      {unitsOpen ? 'Ocultar' : `Ver unidades (${source._count.units})`}
+                    </button>
                     {lastLog && (
                       <button onClick={() => toggle(expandedLogs, setExpandedLogs, source.id)} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700">
                         <StatusBadge status={lastLog.status} />

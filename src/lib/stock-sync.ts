@@ -141,6 +141,56 @@ async function fetchXlsxHeaders(
   return headers
 }
 
+// ─── Preview rows (first N data rows for mapper verification) ────────────────
+
+export async function fetchPreviewRows(
+  fileId: string,
+  fileType: 'GOOGLE_SHEETS' | 'XLSX',
+  sheetName?: string | null,
+  headerRow = 1,
+  limit = 3,
+): Promise<Record<string, unknown>[]> {
+  if (fileType === 'GOOGLE_SHEETS') {
+    const auth = getGoogleAuth()
+    const sheets = google.sheets({ version: 'v4', auth })
+    const range = sheetName ? `${sheetName}!A:ZZ` : 'A:ZZ'
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: fileId, range })
+    const rows = res.data.values ?? []
+    if (rows.length <= headerRow) return []
+    const headers = (rows[headerRow - 1] as string[]).map((h) => String(h ?? '').trim())
+    return rows.slice(headerRow, headerRow + limit).map((row) => {
+      const obj: Record<string, unknown> = {}
+      headers.forEach((h, i) => { if (h) obj[h] = (row as unknown[])[i] ?? null })
+      return obj
+    })
+  }
+
+  // XLSX
+  const auth = getGoogleAuth()
+  const drive = google.drive({ version: 'v3', auth })
+  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.read(response.data as Readable)
+  const sheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0]
+  if (!sheet) return []
+
+  let headers: string[] = []
+  const result: Record<string, unknown>[] = []
+
+  sheet.eachRow((row, rowNumber) => {
+    if (result.length >= limit) return
+    const values = (row.values as ExcelJS.CellValue[]).slice(1).map(cellToValue)
+    if (rowNumber === headerRow) {
+      headers = values.map((c) => String(c ?? '').trim())
+    } else if (rowNumber > headerRow) {
+      const obj: Record<string, unknown> = {}
+      headers.forEach((h, i) => { if (h) obj[h] = values[i] ?? null })
+      result.push(obj)
+    }
+  })
+  return result
+}
+
 // ─── Row fetchers ─────────────────────────────────────
 
 async function fetchFromGoogleSheets(
