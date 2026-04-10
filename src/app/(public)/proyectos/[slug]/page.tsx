@@ -259,7 +259,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           {/* Right column */}
           <div className="space-y-6">
-            <div className="bg-brand-surface text-gray-900 p-6 sticky top-24 border border-gray-200">
+            <div className="bg-brand-surface text-gray-900 p-6 border border-gray-200">
               <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Precio desde</p>
               <p className="font-display text-4xl font-bold text-brand-primary mb-1">
                 {project.priceFrom ? formatPrice(project.priceFrom, project.currency || 'UF') : 'Consultar'}
