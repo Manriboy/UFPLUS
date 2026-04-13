@@ -90,6 +90,24 @@ function cellToValue(v: ExcelJS.CellValue): unknown {
   return v
 }
 
+// ─── Drive file downloader (handles native Sheets converted from XLSX) ────────
+
+const SHEETS_MIME = 'application/vnd.google-apps.spreadsheet'
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+async function downloadXlsxStream(fileId: string): Promise<Readable> {
+  const auth = getGoogleAuth()
+  const drive = google.drive({ version: 'v3', auth })
+  // Check mime type first — if Drive auto-converted to Google Sheets, use export
+  const meta = await drive.files.get({ fileId, fields: 'mimeType' })
+  if (meta.data.mimeType === SHEETS_MIME) {
+    const res = await drive.files.export({ fileId, mimeType: XLSX_MIME }, { responseType: 'stream' })
+    return res.data as Readable
+  }
+  const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
+  return res.data as Readable
+}
+
 // ─── Header fetchers ──────────────────────────────────
 
 /** Devuelve la lista de encabezados detectados desde la fila indicada */
@@ -125,11 +143,9 @@ async function fetchXlsxHeaders(
   sheetName?: string | null,
   headerRow = 1
 ): Promise<string[]> {
-  const auth = getGoogleAuth()
-  const drive = google.drive({ version: 'v3', auth })
-  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
+  const stream = await downloadXlsxStream(fileId)
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.read(response.data as Readable)
+  await workbook.xlsx.read(stream)
   const sheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0]
   if (!sheet) throw new Error(`Hoja "${sheetName ?? 'primera hoja'}" no encontrada`)
   const row = sheet.getRow(headerRow)
@@ -166,11 +182,9 @@ export async function fetchPreviewRows(
   }
 
   // XLSX
-  const auth = getGoogleAuth()
-  const drive = google.drive({ version: 'v3', auth })
-  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
+  const stream = await downloadXlsxStream(fileId)
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.read(response.data as Readable)
+  await workbook.xlsx.read(stream)
   const sheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0]
   if (!sheet) return []
 
@@ -217,11 +231,9 @@ async function fetchFromXlsx(
   sheetName?: string | null,
   headerRow = 1
 ): Promise<Record<string, unknown>[]> {
-  const auth = getGoogleAuth()
-  const drive = google.drive({ version: 'v3', auth })
-  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
+  const stream = await downloadXlsxStream(fileId)
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.read(response.data as Readable)
+  await workbook.xlsx.read(stream)
   const sheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0]
   if (!sheet) throw new Error(`Hoja "${sheetName ?? 'primera hoja'}" no encontrada`)
 
