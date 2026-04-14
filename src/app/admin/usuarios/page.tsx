@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 
 interface User {
   id: string
@@ -25,6 +26,8 @@ export default function UsuariosPage() {
   const [selected, setSelected] = useState<User | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [pwForm, setPwForm] = useState({ password: '', confirm: '' })
+  const [showPw, setShowPw] = useState(false)
+  const [showPwConfirm, setShowPwConfirm] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
@@ -65,6 +68,8 @@ export default function UsuariosPage() {
   function openPassword(u: User) {
     setSelected(u)
     setPwForm({ password: '', confirm: '' })
+    setShowPw(false)
+    setShowPwConfirm(false)
     setError('')
     setModal('password')
   }
@@ -204,11 +209,21 @@ export default function UsuariosPage() {
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Nueva contraseña</label>
-              <input type="password" value={pwForm.password} onChange={(e) => setPwForm({ ...pwForm, password: e.target.value })} className="input-field text-sm w-full" />
+              <div className="relative">
+                <input type={showPw ? 'text' : 'password'} value={pwForm.password} onChange={(e) => setPwForm({ ...pwForm, password: e.target.value })} className="input-field text-sm w-full pr-9" />
+                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Confirmar contraseña</label>
-              <input type="password" value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} className="input-field text-sm w-full" />
+              <div className="relative">
+                <input type={showPwConfirm ? 'text' : 'password'} value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} className="input-field text-sm w-full pr-9" />
+                <button type="button" onClick={() => setShowPwConfirm(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPwConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             {error && <p className="text-xs text-red-600">{error}</p>}
           </div>
