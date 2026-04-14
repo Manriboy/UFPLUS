@@ -2,6 +2,7 @@
 import type { Metadata } from 'next'
 import { DM_Sans } from 'next/font/google'
 import './globals.css'
+import ProgressBar from '@/components/ProgressBar'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -28,7 +29,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={dmSans.variable}>
-      <body className="font-sans antialiased bg-white text-brand-text">{children}</body>
+      <body className="font-sans antialiased bg-white text-brand-text">
+        <ProgressBar />
+        {children}
+      </body>
     </html>
   )
 }
