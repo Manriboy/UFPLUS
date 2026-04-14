@@ -178,7 +178,9 @@ export default function UsuariosPage() {
                   <td className="px-4 py-3 text-right space-x-2">
                     <button onClick={() => openEdit(u)} className="text-xs text-blue-600 hover:underline">Editar</button>
                     <button onClick={() => openPassword(u)} className="text-xs text-gray-600 hover:underline">Contraseña</button>
-                    <button onClick={() => handleDelete(u)} className="text-xs text-red-500 hover:underline">Eliminar</button>
+                    {u.id !== session?.user?.id && (
+                      <button onClick={() => handleDelete(u)} className="text-xs text-red-500 hover:underline">Eliminar</button>
+                    )}
                   </td>
                 </tr>
               ))}

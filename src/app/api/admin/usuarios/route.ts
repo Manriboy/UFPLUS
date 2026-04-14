@@ -109,15 +109,19 @@ export async function DELETE(req: NextRequest) {
     const target = await prisma.user.findUnique({ where: { id } })
     if (!target) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
 
+    const requesterId = session!.user.id
+
+    // Nunca puedes eliminarte a ti mismo
+    if (target.id === requesterId) {
+      return NextResponse.json({ error: 'No puedes eliminarte a ti mismo' }, { status: 400 })
+    }
+
+    // Para eliminar un superadmin debe haber al menos 2
     if (target.role === 'SUPERADMIN') {
       const superadminCount = await prisma.user.count({ where: { role: 'SUPERADMIN' } })
       if (superadminCount <= 1) {
         return NextResponse.json({ error: 'No se puede eliminar el único superadmin' }, { status: 400 })
       }
-    }
-
-    if (target.id === session!.user.id) {
-      return NextResponse.json({ error: 'No puedes eliminarte a ti mismo' }, { status: 400 })
     }
 
     await prisma.user.delete({ where: { id } })
