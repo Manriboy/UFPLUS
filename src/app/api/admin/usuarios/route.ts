@@ -6,8 +6,8 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function isSuperAdmin(session: any) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-any
+function isSuperAdmin(session: Record<string, any> | null) {
   return session?.user?.role === 'SUPERADMIN'
 }
 
@@ -97,7 +97,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   // No eliminar a uno mismo
-  if (target.id === (session as any).user.id) {
+  if (target.id === (session as Record<string, Record<string, string>>).user.id) {
     return NextResponse.json({ error: 'No puedes eliminarte a ti mismo' }, { status: 400 })
   }
 
