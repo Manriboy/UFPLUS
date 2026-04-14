@@ -529,6 +529,7 @@ export default function StockPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState<string | null>(null)
+  const [syncingAll, setSyncingAll] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<StockSource | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -589,6 +590,26 @@ export default function StockPage() {
     loadSources()
   }
 
+  async function handleSyncAll() {
+    const active = sources.filter((s) => s.isActive)
+    if (active.length === 0) { notify('No hay fuentes activas para sincronizar', false); return }
+    setSyncingAll(true)
+    notify(`Sincronizando ${active.length} fuente${active.length > 1 ? 's' : ''}…`)
+    let ok = 0, failed = 0
+    for (const source of active) {
+      setSyncing(source.id)
+      try {
+        const res = await fetch('/api/stock/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stockSourceId: source.id }) })
+        const data = await res.json()
+        data.ok ? ok++ : failed++
+      } catch { failed++ }
+    }
+    setSyncing(null)
+    setSyncingAll(false)
+    notify(`Sync global completado: ${ok} exitoso${ok !== 1 ? 's' : ''}${failed > 0 ? `, ${failed} con error` : ''}`, failed === 0)
+    loadSources()
+  }
+
   async function handleSync(sourceId: string, projectName: string) {
     setSyncing(sourceId)
     notify(`Sincronizando "${projectName}"…`)
@@ -618,9 +639,19 @@ export default function StockPage() {
           <h1 className="text-xl font-bold text-gray-900">Sync de Stock</h1>
           <p className="text-sm text-gray-500 mt-0.5">Conecta proyectos a Google Sheets o Excel para sincronizar unidades.</p>
         </div>
-        <button onClick={() => { setEditing(null); setShowModal(true) }} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus className="h-4 w-4" /> Nueva fuente
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncAll}
+            disabled={syncingAll || !!syncing}
+            className={cn('flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-brand-primary text-brand-primary font-medium hover:bg-brand-primary/5 transition-colors', (syncingAll || !!syncing) && 'opacity-50 cursor-not-allowed')}
+          >
+            <RefreshCw className={cn('h-4 w-4', syncingAll && 'animate-spin')} />
+            {syncingAll ? 'Sincronizando…' : 'Sincronizar todo'}
+          </button>
+          <button onClick={() => { setEditing(null); setShowModal(true) }} className="btn-primary flex items-center gap-2 text-sm">
+            <Plus className="h-4 w-4" /> Nueva fuente
+          </button>
+        </div>
       </div>
 
       {toast && (
