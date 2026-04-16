@@ -1,6 +1,7 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next'
 import { DM_Sans } from 'next/font/google'
+import { Suspense } from 'react'
 import './globals.css'
 import ProgressBar from '@/components/ProgressBar'
 
@@ -18,6 +19,10 @@ export const metadata: Metadata = {
   description:
     'UFPlus es tu broker inmobiliario de confianza en Chile. Maximiza tu patrimonio con departamentos de inversión seleccionados por expertos.',
   keywords: ['inversión inmobiliaria', 'departamentos', 'Chile', 'broker inmobiliario', 'plusvalía'],
+  icons: {
+    icon: '/logos/logo-color.png',
+    apple: '/logos/logo-color.png',
+  },
   openGraph: {
     type: 'website',
     locale: 'es_CL',
@@ -30,7 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es" className={dmSans.variable}>
       <body className="font-sans antialiased bg-white text-brand-text">
-        <ProgressBar />
+        <Suspense fallback={null}>
+          <ProgressBar />
+        </Suspense>
         {children}
       </body>
     </html>
