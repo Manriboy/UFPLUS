@@ -19,10 +19,6 @@ export const metadata: Metadata = {
   description:
     'UFPlus es tu broker inmobiliario de confianza en Chile. Maximiza tu patrimonio con departamentos de inversión seleccionados por expertos.',
   keywords: ['inversión inmobiliaria', 'departamentos', 'Chile', 'broker inmobiliario', 'plusvalía'],
-  icons: {
-    icon: '/logos/logo-color.png',
-    apple: '/logos/logo-color.png',
-  },
   openGraph: {
     type: 'website',
     locale: 'es_CL',
