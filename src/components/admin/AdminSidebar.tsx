@@ -1,6 +1,7 @@
 'use client'
 // src/components/admin/AdminSidebar.tsx
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
@@ -59,14 +60,19 @@ export default function AdminSidebar() {
   return (
     <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200 min-h-screen">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-100">
-        <Link href="/" className="flex items-center gap-0.5">
-          <span className="font-display text-xl font-bold text-brand-primary">UF</span>
-          <span className="font-display text-xl font-bold text-brand-secondary">Plus</span>
+      <div className="h-16 flex items-center px-5 border-b border-gray-100">
+        <Link href="/" className="flex items-center gap-3">
+          <Image
+            src="/logos/admin-logo.png"
+            alt="UFPlus"
+            width={32}
+            height={32}
+            className="rounded"
+          />
+          <span className="font-display text-base font-bold text-brand-text tracking-tight">
+            UFPlus <span className="text-[10px] font-semibold text-white bg-brand-primary px-1.5 py-0.5 uppercase tracking-wide rounded ml-0.5">Admin</span>
+          </span>
         </Link>
-        <span className="ml-2 text-[10px] font-semibold text-white bg-brand-primary px-1.5 py-0.5 uppercase tracking-wide">
-          Admin
-        </span>
       </div>
 
       {/* Navigation */}
