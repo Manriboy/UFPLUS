@@ -4,7 +4,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   Search, RefreshCw, MapPin, Calendar, ChevronDown, ChevronUp,
-  Home, AlertCircle, FileText, Percent, X,
+  Home, AlertCircle, FileText, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
@@ -30,7 +30,8 @@ interface IrisUnit {
 }
 
 interface IrisProject {
-  id: number
+  id: string | number
+  source: 'iris' | 'ufplus'
   title: string
   address: string
   handover_date_text: string
@@ -42,7 +43,6 @@ interface IrisProject {
   zone: { id: number; name: string } | null
   department: string | null
   status: string | null
-  commission: { percent: number; full_value: string } | null
   units: IrisUnit[]
 }
 
@@ -301,6 +301,11 @@ function ProjectCard({ project }: { project: IrisProject }) {
           </div>
         )}
         <div className="absolute top-2 left-2 flex gap-1.5 flex-wrap">
+          {project.source === 'ufplus' && (
+            <span className="bg-brand-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+              UFPlus
+            </span>
+          )}
           {project.pie_bonus && (
             <span className="bg-brand-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
               Bono Pie {project.pie_bonus_conditions}%
@@ -338,12 +343,6 @@ function ProjectCard({ project }: { project: IrisProject }) {
 
         {range && <div className="text-sm font-bold text-brand-primary mb-3">{range}</div>}
 
-        {project.commission && (
-          <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-lg mb-3">
-            <Percent className="h-3 w-3 flex-shrink-0" />
-            <span className="font-medium">Comisión: {project.commission.full_value}</span>
-          </div>
-        )}
 
         {project.brochure && (
           <a
