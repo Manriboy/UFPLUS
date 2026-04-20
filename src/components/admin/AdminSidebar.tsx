@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Users,
   UserCircle,
+  Building2,
 } from 'lucide-react'
 
 const nav = [
@@ -39,6 +40,11 @@ const nav = [
     label: 'Sync de Stock',
     href: '/admin/stock',
     icon: RefreshCw,
+  },
+  {
+    label: 'Consulta Iris',
+    href: '/admin/iris',
+    icon: Building2,
   },
 ]
 
