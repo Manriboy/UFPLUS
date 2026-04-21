@@ -60,20 +60,19 @@ export default function AdminSidebar() {
   return (
     <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200 min-h-screen">
       {/* Logo */}
-      <div className="h-16 flex items-center px-5 border-b border-gray-100">
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/logos/admin-logo.png"
-            alt="UFPlus"
-            width={32}
-            height={32}
-            className="rounded"
-          />
-          <span className="font-display text-base font-bold text-brand-text tracking-tight">
-            UFPlus <span className="text-[10px] font-semibold text-white bg-brand-primary px-1.5 py-0.5 uppercase tracking-wide rounded ml-0.5">Admin</span>
-          </span>
-        </Link>
-      </div>
+      <Link href="/" className="block bg-brand-primary px-5 py-4 border-b border-brand-primary/20">
+        <Image
+          src="/logos/admin-logo.png"
+          alt="UFPlus"
+          width={216}
+          height={92}
+          className="w-full h-auto"
+          priority
+        />
+        <p className="text-center text-[9px] font-bold text-white/60 uppercase tracking-widest mt-1">
+          Admin
+        </p>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
