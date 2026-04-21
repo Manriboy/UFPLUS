@@ -60,7 +60,7 @@ export default function AdminSidebar() {
   return (
     <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200 min-h-screen">
       {/* Logo */}
-      <Link href="/" className="block bg-brand-primary px-5 py-4 border-b border-brand-primary/20">
+      <Link href="/" className="block bg-white px-5 py-4 border-b border-gray-100">
         <Image
           src="/logos/admin-logo.png"
           alt="UFPlus"
@@ -69,7 +69,7 @@ export default function AdminSidebar() {
           className="w-full h-auto"
           priority
         />
-        <p className="text-center text-[9px] font-bold text-white/60 uppercase tracking-widest mt-1">
+        <p className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
           Admin
         </p>
       </Link>
