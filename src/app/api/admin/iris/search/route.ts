@@ -132,6 +132,12 @@ function deliveryTypeToStatus(dt: string): string {
   return map[dt] ?? dt
 }
 
+// ─── Normalizar dirección para deduplicación ──────────
+
+function normalizeAddress(addr: string): string {
+  return addr.toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
 // ─── Fetch a Iris ─────────────────────────────────────
 
 async function fetchIrisPage(page: number, projectStatus: number[], token: string) {
@@ -422,12 +428,38 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 4. Unificar y paginar (UFPlus primero) ────────────
+  // ── 4. Deduplicar: si UFPlus y Iris comparten dirección, gana Iris ──
+
+  const irisAddresses = new Set(
+    filteredIris
+      .map((p) => p.address)
+      .filter(Boolean)
+      .map((a) => normalizeAddress(a))
+  )
+
+  const dedupedUFPlus = filteredUFPlus.filter(
+    (p) => !p.address || !irisAddresses.has(normalizeAddress(p.address))
+  )
+
+  // ── 5. Unificar ───────────────────────────────────────
 
   const combined: MappedProject[] = [
-    ...filteredUFPlus.map(mapUFPlusProject),
+    ...dedupedUFPlus.map(mapUFPlusProject),
     ...filteredIris.map(mapIrisProject),
   ]
+
+  // ── 6. Filtrar unidades por precio dentro de cada proyecto ───────
+
+  if (applyPrice) {
+    combined.forEach((p) => {
+      p.units = p.units.filter((u) => {
+        const price = u.final_price || u.price
+        if (priceMin !== null && priceMin > 0 && price < priceMin) return false
+        if (priceMax !== null && priceMax < 15000 && price > priceMax) return false
+        return true
+      })
+    })
+  }
 
   const totalCombined = combined.length
   const start = (page - 1) * PAGE_SIZE

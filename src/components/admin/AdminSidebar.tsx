@@ -44,7 +44,7 @@ const nav = [
   },
   {
     label: 'Consulta Stock',
-    href: '/admin/iris',
+    href: '/admin/search',
     icon: Building2,
   },
 ]

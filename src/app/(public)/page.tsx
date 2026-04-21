@@ -1,5 +1,5 @@
 // src/app/(public)/page.tsx
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600 // revalidar cada hora
 import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -48,12 +48,6 @@ async function getFeaturedProjects() {
   })
 }
 
-async function getAllActiveProjects() {
-  return prisma.project.findMany({
-    where: { isActive: true, isArchived: false },
-    select: { id: true, name: true, slug: true },
-  })
-}
 
 const benefits = [
   {
@@ -143,7 +137,7 @@ const testimonials = [
 ]
 
 export default async function HomePage() {
-  const [featuredProjects] = await Promise.all([getFeaturedProjects(), getAllActiveProjects()])
+  const featuredProjects = await getFeaturedProjects()
 
   return (
     <>

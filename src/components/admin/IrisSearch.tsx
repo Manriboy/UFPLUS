@@ -283,10 +283,46 @@ function bedroomTags(units: IrisUnit[]) {
   return types.map((b) => (b === 0 ? 'Estudio' : `${b} dorm.`))
 }
 
+type SortKey = 'description' | 'db' | 'm2' | 'price' | 'floor' | 'orientation'
+
 function ProjectCard({ project }: { project: IrisProject }) {
   const [expanded, setExpanded] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
   const range = priceRange(project.units)
   const tags = bedroomTags(project.units)
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const sortedUnits = [...project.units].sort((a, b) => {
+    if (!sortKey) return 0
+    const dir = sortDir === 'asc' ? 1 : -1
+    switch (sortKey) {
+      case 'description': return dir * (a.description || a.tipology).localeCompare(b.description || b.tipology)
+      case 'db': return dir * ((a.bedrooms * 10 + a.bathrooms) - (b.bedrooms * 10 + b.bathrooms))
+      case 'm2': return dir * (a.m2 - b.m2)
+      case 'price': return dir * ((a.final_price || a.price) - (b.final_price || b.price))
+      case 'floor': return dir * (a.floor || '').localeCompare(b.floor || '', undefined, { numeric: true })
+      case 'orientation': return dir * (a.orientation || '').localeCompare(b.orientation || '')
+      default: return 0
+    }
+  })
+
+  const SortTh = ({ col, label, align = 'left' }: { col: SortKey; label: string; align?: 'left' | 'right' }) => (
+    <th
+      className={cn('px-3 py-2 font-medium cursor-pointer select-none hover:text-gray-700 whitespace-nowrap', align === 'right' ? 'text-right' : 'text-left')}
+      onClick={() => toggleSort(col)}
+    >
+      <span className="inline-flex items-center gap-0.5">
+        {label}
+        {sortKey === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'}
+      </span>
+    </th>
+  )
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
@@ -303,7 +339,7 @@ function ProjectCard({ project }: { project: IrisProject }) {
         <div className="absolute top-2 left-2 flex gap-1.5 flex-wrap">
           {project.source === 'ufplus' && (
             <span className="bg-brand-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-              UFPlus
+              UFPLUS
             </span>
           )}
           {project.pie_bonus && (
@@ -343,7 +379,6 @@ function ProjectCard({ project }: { project: IrisProject }) {
 
         {range && <div className="text-sm font-bold text-brand-primary mb-3">{range}</div>}
 
-
         {project.brochure && (
           <a
             href={project.brochure}
@@ -371,16 +406,16 @@ function ProjectCard({ project }: { project: IrisProject }) {
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 border-b border-gray-100">
-                      <th className="px-3 py-2 text-left font-medium">Tipo</th>
-                      <th className="px-3 py-2 text-left font-medium">D/B</th>
-                      <th className="px-3 py-2 text-right font-medium">m²</th>
-                      <th className="px-3 py-2 text-right font-medium">Precio UF</th>
-                      <th className="px-3 py-2 text-left font-medium">Piso</th>
-                      <th className="px-3 py-2 text-left font-medium">Orient.</th>
+                      <SortTh col="description" label="Tipo" />
+                      <SortTh col="db" label="D/B" />
+                      <SortTh col="m2" label="m²" align="right" />
+                      <SortTh col="price" label="Precio UF" align="right" />
+                      <SortTh col="floor" label="Piso" />
+                      <SortTh col="orientation" label="Orient." />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {project.units.map((u) => (
+                    {sortedUnits.map((u) => (
                       <tr key={u.id} className="hover:bg-gray-50">
                         <td className="px-3 py-1.5 text-gray-700 font-medium">{u.description || u.tipology}</td>
                         <td className="px-3 py-1.5 text-gray-600">{u.bedrooms}D/{u.bathrooms}B</td>
@@ -423,7 +458,7 @@ export default function IrisSearch() {
 
   const selectedRegion = IRIS_REGIONS.find((r) => r.id === regionId)
   const totalPages = Math.ceil(total / 12)
-  const canSearch = regionId !== '' && zoneIds.length > 0
+  const canSearch = regionId !== ''
 
   // Al cambiar región, limpiar comunas seleccionadas
   const handleRegionChange = (id: number | '') => {
@@ -617,7 +652,7 @@ export default function IrisSearch() {
         <div className="flex items-center justify-between pt-1 border-t border-gray-100">
           <p className="text-xs text-gray-400">
             {!canSearch ? (
-              <span className="text-amber-600">Selecciona región y al menos una comuna para consultar</span>
+              <span className="text-amber-600">Selecciona una región para consultar</span>
             ) : (
               <span className="text-green-600">Listo para consultar</span>
             )}
@@ -633,7 +668,7 @@ export default function IrisSearch() {
             {loading
               ? <RefreshCw className="h-4 w-4 animate-spin" />
               : <Search className="h-4 w-4" />}
-            {loading ? 'Consultando Iris…' : 'Consultar'}
+            {loading ? 'Buscando proyectos…' : 'Consultar'}
           </button>
         </div>
       </div>
@@ -688,7 +723,7 @@ export default function IrisSearch() {
       {!searched && !loading && (
         <div className="py-24 text-center">
           <Search className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-sm text-gray-400">Selecciona región y comunas, luego presiona Consultar</p>
+          <p className="text-sm text-gray-400">Selecciona una región y presiona Consultar</p>
         </div>
       )}
     </div>
