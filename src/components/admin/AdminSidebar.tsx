@@ -43,7 +43,7 @@ const nav = [
     icon: RefreshCw,
   },
   {
-    label: 'Consulta Iris',
+    label: 'Consulta Stock',
     href: '/admin/iris',
     icon: Building2,
   },
@@ -58,7 +58,7 @@ export default function AdminSidebar() {
     href === '/admin' ? pathname === href : pathname.startsWith(href)
 
   return (
-    <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200 min-h-screen">
+    <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200 min-h-screen overflow-hidden">
       {/* Logo */}
       <Link href="/" className="block bg-white px-5 py-4 border-b border-gray-100">
         <Image
@@ -75,7 +75,7 @@ export default function AdminSidebar() {
       </Link>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {nav.map((item) => {
           const Icon = item.icon
           const active = isActive(item.href)
