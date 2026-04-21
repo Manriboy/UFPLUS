@@ -475,9 +475,9 @@ export default function IrisSearch() {
 
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Consulta Iris</h1>
+        <h1 className="text-xl font-bold text-gray-900">Consulta Stock</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Stock disponible en iris.yapo.cl{total > 0 && ` · ${total} proyectos encontrados`}
+          Stock disponible{total > 0 && ` · ${total} proyectos encontrados`}
         </p>
       </div>
 
