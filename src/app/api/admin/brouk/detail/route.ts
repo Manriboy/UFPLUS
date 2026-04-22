@@ -13,7 +13,7 @@ const BROUK_DETAIL_URL =
 
 function fixEncoding(str: string): string {
   try {
-    const bytes = new Uint8Array([...str].map((c) => c.charCodeAt(0) & 0xff))
+    const bytes = new Uint8Array(Array.from(str).map((c) => c.charCodeAt(0) & 0xff))
     const decoded = new TextDecoder('utf-8').decode(bytes)
     return decoded.includes('\uFFFD') ? str : decoded
   } catch {
