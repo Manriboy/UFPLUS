@@ -221,10 +221,10 @@ function mapUFPlusProject(p: UFPlusProject): MappedProject {
         bedrooms: parseBedroomsFromString(u.tipologia),
         bathrooms: parseBathroomsFromString(u.tipologia),
         m2: u.supTotal ?? u.supInterior ?? 0,
-        price: u.precioUf ?? p.priceFrom ?? 0,
+        price: u.precioUf ?? 0,
         final_price: u.precioUf
           ? u.descuento ? u.precioUf * (1 - u.descuento / 100) : u.precioUf
-          : p.priceFrom ?? 0,
+          : 0,
         currency: 'UF',
         floor: u.piso?.toString() ?? '',
         orientation: u.orientacion ?? null,
@@ -296,7 +296,9 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const token = process.env.IRIS_BEARER_TOKEN
+  // Leer token desde BD primero; fallback a variable de entorno
+  const dbSetting = await prisma.setting.findUnique({ where: { key: 'iris_token' } })
+  const token = dbSetting?.value || process.env.IRIS_BEARER_TOKEN
   if (!token) return NextResponse.json({ error: 'Token de Iris no configurado' }, { status: 500 })
 
   const body = await req.json()
@@ -428,38 +430,45 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 4. Deduplicar: si UFPlus y Iris comparten dirección, gana Iris ──
+  // ── 4. Deduplicar: si UFPlus y Iris comparten dirección O nombre, gana Iris ──
+
+  const normalizeTitle = (t: string) => t.toLowerCase().trim().replace(/\s+/g, ' ')
 
   const irisAddresses = new Set(
-    filteredIris
-      .map((p) => p.address)
-      .filter(Boolean)
-      .map((a) => normalizeAddress(a))
+    filteredIris.map((p) => p.address).filter(Boolean).map((a) => normalizeAddress(a))
+  )
+  const irisTitles = new Set(
+    filteredIris.map((p) => normalizeTitle(p.title))
   )
 
-  const dedupedUFPlus = filteredUFPlus.filter(
-    (p) => !p.address || !irisAddresses.has(normalizeAddress(p.address))
-  )
+  const dedupedUFPlus = filteredUFPlus.filter((p) => {
+    const addressMatch = p.address && irisAddresses.has(normalizeAddress(p.address))
+    const titleMatch = irisTitles.has(normalizeTitle(p.name))
+    return !addressMatch && !titleMatch
+  })
 
-  // ── 5. Unificar ───────────────────────────────────────
+  // ── 5. Unificar: Iris primero, UFPlus al final ────────
 
   const combined: MappedProject[] = [
-    ...dedupedUFPlus.map(mapUFPlusProject),
     ...filteredIris.map(mapIrisProject),
+    ...dedupedUFPlus.map(mapUFPlusProject),
   ]
 
-  // ── 6. Filtrar unidades por precio dentro de cada proyecto ───────
+  // ── 6. Filtrar unidades por tipología y precio dentro de cada proyecto ───────
 
-  if (applyPrice) {
-    combined.forEach((p) => {
+  combined.forEach((p) => {
+    if (tipologias.length > 0) {
+      p.units = p.units.filter((u) => matchesTipologia(u, tipologias))
+    }
+    if (applyPrice) {
       p.units = p.units.filter((u) => {
         const price = u.final_price || u.price
         if (priceMin !== null && priceMin > 0 && price < priceMin) return false
         if (priceMax !== null && priceMax < 15000 && price > priceMax) return false
         return true
       })
-    })
-  }
+    }
+  })
 
   const totalCombined = combined.length
   const start = (page - 1) * PAGE_SIZE

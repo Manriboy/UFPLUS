@@ -15,6 +15,7 @@ import {
   Users,
   UserCircle,
   Building2,
+  Store,
 } from 'lucide-react'
 
 const nav = [
@@ -46,6 +47,11 @@ const nav = [
     label: 'Consulta Stock',
     href: '/admin/search',
     icon: Building2,
+  },
+  {
+    label: 'Stock off-line',
+    href: '/admin/search2',
+    icon: Store,
   },
 ]
 
