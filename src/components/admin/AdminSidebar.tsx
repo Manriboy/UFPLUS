@@ -61,7 +61,7 @@ export default function AdminSidebar() {
   const isSuperAdmin = session?.user?.role === 'SUPERADMIN'
 
   const isActive = (href: string) =>
-    href === '/admin' ? pathname === href : pathname.startsWith(href)
+    href === '/admin' ? pathname === href : pathname === href || pathname.startsWith(href + '/')
 
   return (
     <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200 min-h-screen overflow-hidden">

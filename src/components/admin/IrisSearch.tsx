@@ -686,7 +686,7 @@ export default function IrisSearch() {
         <div className="flex items-center justify-between gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <span>{tokenExpired ? 'Token de Iris expirado — renuévalo desde DevTools' : error}</span>
+            <span>{tokenExpired ? 'Token de Consulta Stock expirado — renuévalo desde DevTools' : error}</span>
           </div>
           {tokenExpired && (
             <button

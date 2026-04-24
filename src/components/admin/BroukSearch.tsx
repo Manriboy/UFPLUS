@@ -5,6 +5,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   Search, RefreshCw, MapPin, Home, AlertCircle,
   ChevronDown, X, Train, Building2, FolderOpen, FileSpreadsheet,
+  KeyRound, ClipboardPaste, CheckCircle2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BroukProject } from '@/app/api/admin/brouk/search/route'
@@ -207,6 +208,10 @@ export default function BroukSearch() {
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState('')
   const [total, setTotal] = useState(0)
+  const [tokenExpired, setTokenExpired] = useState(false)
+  const [newToken, setNewToken] = useState('')
+  const [savingToken, setSavingToken] = useState(false)
+  const [tokenSaved, setTokenSaved] = useState(false)
 
   // Caché de links por project.id
   const [linkCache, setLinkCache] = useState<Record<string, LinkState>>({})
@@ -238,7 +243,12 @@ export default function BroukSearch() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Error al consultar'); return }
+      if (!res.ok) {
+        if (res.status === 401 && data.tokenExpired) setTokenExpired(true)
+        setError(data.error ?? 'Error al consultar')
+        return
+      }
+      setTokenExpired(false)
       setProjects(data.projects ?? [])
       setTotal(data.total ?? 0)
       if (data.filterOptions) {
@@ -292,6 +302,34 @@ export default function BroukSearch() {
     }
   }, [linkCache])
 
+  const handleSaveToken = async () => {
+    if (!newToken.trim()) return
+    setSavingToken(true)
+    try {
+      const res = await fetch('/api/admin/brouk/refresh-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: newToken.trim() }),
+      })
+      if (!res.ok) { const d = await res.json(); setError(d.error ?? 'Error al guardar token'); return }
+      setTokenSaved(true)
+      setTokenExpired(false)
+      setNewToken('')
+      setError('')
+      await search()
+    } catch {
+      setError('Error de red al guardar token')
+    } finally {
+      setSavingToken(false)
+    }
+  }
+
+  // Auto-consulta al entrar a la sección
+  useEffect(() => {
+    search()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const clearFilters = () => {
     setFilterComunas([])
     setFilterTipologias([])
@@ -308,7 +346,7 @@ export default function BroukSearch() {
       <div>
         <h1 className="text-xl font-bold text-gray-900">Stock off-line</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Proyectos del showroom de Brouk{total > 0 && ` · ${total} encontrados`}
+          Proyectos de Stock off-line{total > 0 && ` · ${total} encontrados`}
         </p>
       </div>
 
@@ -397,9 +435,57 @@ export default function BroukSearch() {
       </div>
 
       {/* Error */}
-      {error && (
+      {error && !tokenExpired && (
         <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
           <AlertCircle className="h-4 w-4 flex-shrink-0" /> {error}
+        </div>
+      )}
+
+      {/* Panel renovación de token */}
+      {tokenExpired && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <KeyRound className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Token de Stock off-line expirado</p>
+              <p className="text-xs text-amber-700 mt-1">
+                El acceso a Stock off-line expiró. Para renovarlo:
+              </p>
+              <ol className="text-xs text-amber-700 mt-2 space-y-1 list-decimal list-inside">
+                <li>Entra a <strong>www.ufplus.cl/stock-offline</strong> con tu cuenta Google</li>
+                <li>Abre DevTools → Application → Cookies → <code className="bg-amber-100 px-1 rounded">www.ufplus.cl</code></li>
+                <li>Copia el valor de la cookie <strong>jwtToken</strong></li>
+                <li>Pégalo aquí y guarda</li>
+              </ol>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <textarea
+              value={newToken}
+              onChange={(e) => setNewToken(e.target.value)}
+              placeholder="Pega aquí el valor de la cookie jwtToken…"
+              rows={3}
+              className="flex-1 input-field text-xs font-mono resize-none"
+            />
+            <button
+              onClick={handleSaveToken}
+              disabled={savingToken || !newToken.trim()}
+              className="flex flex-col items-center justify-center gap-1.5 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {savingToken
+                ? <><RefreshCw className="h-4 w-4 animate-spin" /> Guardando…</>
+                : <><ClipboardPaste className="h-4 w-4" /> Guardar y<br/>reintentar</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Token guardado exitosamente */}
+      {tokenSaved && !tokenExpired && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+          Token actualizado correctamente
         </div>
       )}
 

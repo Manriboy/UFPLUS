@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
 
 const BROUK_LIST_URL =
   'https://www.brouk.cl/v1/datasource/applications/e4f62324-96a7-44cd-9cb1-3350520dc92e' +
@@ -114,6 +115,7 @@ async function fetchAllBrouk(token: string): Promise<BroukRawItem[]> {
     }),
   })
 
+  if (res.status === 401 || res.status === 403) throw new Error(`401`)
   if (!res.ok) throw new Error(`Brouk respondió ${res.status}`)
   const data = await res.json() as BroukListResponse
   all.push(...(data.items ?? []))
@@ -126,7 +128,9 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const token = process.env.BROUK_JWT_TOKEN
+  // Leer token desde BD primero; fallback a variable de entorno
+  const dbSetting = await prisma.setting.findUnique({ where: { key: 'brouk_token' } })
+  const token = dbSetting?.value || process.env.BROUK_JWT_TOKEN
   if (!token) return NextResponse.json({ error: 'Token de Brouk no configurado' }, { status: 500 })
 
   const body = await req.json()
@@ -141,6 +145,12 @@ export async function POST(req: NextRequest) {
     items = await fetchAllBrouk(token)
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error desconocido'
+    if (msg.includes('401') || msg.includes('403')) {
+      return NextResponse.json(
+        { error: 'Token de Brouk expirado', tokenExpired: true },
+        { status: 401 }
+      )
+    }
     return NextResponse.json({ error: `Error conectando con Brouk: ${msg}` }, { status: 502 })
   }
 

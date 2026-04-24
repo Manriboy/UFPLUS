@@ -2,12 +2,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
 
-const BROUK_DETAIL_URL =
+const BROUK_DETAIL_BASE =
   'https://www.brouk.cl/v1/datasource/applications/e4f62324-96a7-44cd-9cb1-3350520dc92e' +
   '/pages/8fc7d073-ee38-42b1-8dc1-166b26e1b747' +
-  '/blocks/659a2519-3037-4160-ad77-114a963a0d21' +
-  '/datasources/65e3df1a-7b41-4149-999c-a92a7ddcc040/records'
+  '/blocks/5752aca3-488d-46b4-9471-81b3840119b6' +
+  '/datasources/7a7b5528-3770-4139-99d9-e8eb39674df3/records'
 
 // ─── Fix encoding ────────────────────────────────────
 
@@ -77,13 +78,14 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const token = process.env.BROUK_JWT_TOKEN
+  const dbSetting = await prisma.setting.findUnique({ where: { key: 'brouk_token' } })
+  const token = dbSetting?.value || process.env.BROUK_JWT_TOKEN
   if (!token) return NextResponse.json({ error: 'Token de Brouk no configurado' }, { status: 500 })
 
   const { recordId } = await req.json()
   if (!recordId) return NextResponse.json({ error: 'recordId requerido' }, { status: 400 })
 
-  const res = await fetch(BROUK_DETAIL_URL, {
+  const res = await fetch(`${BROUK_DETAIL_BASE}/${recordId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -94,20 +96,25 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       options: { timeZone: 'America/Santiago', userLocale: 'en-US' },
-      pageContext: { recordId },
+      pageContext: null,
       filterCriteria: {},
-      pagingOption: { offset: null, count: 1 },
     }),
   })
 
   if (!res.ok) {
+    const errText = await res.text()
+    console.error(`[brouk/detail] Brouk respondió ${res.status}:`, errText)
     return NextResponse.json({ error: `Brouk respondió ${res.status}` }, { status: 502 })
   }
 
-  const data = await res.json()
-  const item: BroukDetailRaw | undefined = data?.items?.[0]
+  const raw = await res.json()
+  console.log('[brouk/detail] raw response keys:', Object.keys(raw))
 
-  if (!item) {
+  // El endpoint puede devolver el record directamente o dentro de { items: [...] }
+  const item: BroukDetailRaw | undefined = raw?.fields ? raw : raw?.items?.[0]
+
+  if (!item?.fields) {
+    console.error('[brouk/detail] No se encontró item con fields. raw:', JSON.stringify(raw).slice(0, 300))
     return NextResponse.json({ error: 'Proyecto no encontrado en Brouk' }, { status: 404 })
   }
 
