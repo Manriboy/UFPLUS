@@ -157,16 +157,18 @@ export default async function HomePage() {
     <>
       {/* ─── BANNER PUBLICITARIO ───────────────────────────── */}
       {banner.isActive && banner.imageUrl && (
-        <a href="/#contacto" className="block w-full">
-          <Image
-            src={banner.imageUrl}
-            alt="Banner publicitario UFPlus"
-            width={1920}
-            height={600}
-            className="w-full h-auto object-cover"
-            priority
-          />
-        </a>
+        <div className="pt-[72px] sm:pt-[80px] lg:pt-[88px]">
+          <a href="/#contacto" className="block w-full">
+            <Image
+              src={banner.imageUrl}
+              alt="Banner publicitario UFPlus"
+              width={1920}
+              height={600}
+              className="w-full h-auto object-cover"
+              priority
+            />
+          </a>
+        </div>
       )}
 
       {/* ─── HERO ──────────────────────────────────────────── */}

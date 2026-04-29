@@ -194,42 +194,6 @@ export default function BannerAdmin() {
         )}
       </div>
 
-      {/* Preview en contexto */}
-      {currentImage && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-1">Vista previa en contexto</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Así se verá el banner sobre el hero en la página de inicio.
-          </p>
-          <div className="w-full overflow-hidden rounded border border-gray-200 bg-gray-100">
-            {/* Banner simulado */}
-            <div className="relative w-full" style={{ aspectRatio: '1920/200' }}>
-              <Image
-                src={currentImage}
-                alt="Banner publicitario"
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </div>
-            {/* Hero simulado */}
-            <div className="bg-[#0D0D0D] px-6 py-8 flex flex-col gap-2">
-              <div className="w-1 self-stretch bg-brand-primary absolute left-0" />
-              <p className="text-white/40 text-[10px] uppercase tracking-widest">Tu socio en Inversiones Inmobiliarias</p>
-              <div className="h-4 bg-white/10 rounded w-2/3" />
-              <div className="h-4 bg-white/10 rounded w-1/2 mt-1" />
-              <div className="h-3 bg-white/5 rounded w-3/4 mt-2" />
-              <div className="flex gap-3 mt-4">
-                <div className="h-8 w-36 bg-red-700/60 rounded" />
-                <div className="h-8 w-28 border border-white/20 rounded" />
-              </div>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-gray-400">
-            El banner es clickeable y lleva al formulario de contacto.
-          </p>
-        </div>
-      )}
 
       {/* Botón guardar */}
       <div className="flex justify-end">
