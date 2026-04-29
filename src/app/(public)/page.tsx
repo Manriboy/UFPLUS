@@ -25,6 +25,17 @@ export const metadata: Metadata = {
     'Maximiza tu patrimonio con departamentos de inversión seleccionados por expertos. Asesoría personalizada, proyectos de alta plusvalía en Chile.',
 }
 
+async function getBannerConfig() {
+  const [active, imageUrl] = await Promise.all([
+    prisma.setting.findUnique({ where: { key: 'banner_active' } }),
+    prisma.setting.findUnique({ where: { key: 'banner_image_url' } }),
+  ])
+  return {
+    isActive: active?.value === 'true',
+    imageUrl: imageUrl?.value ?? null,
+  }
+}
+
 async function getFeaturedProjects() {
   return prisma.project.findMany({
     where: { isActive: true, isArchived: false, isFeatured: true },
@@ -137,10 +148,27 @@ const testimonials = [
 ]
 
 export default async function HomePage() {
-  const featuredProjects = await getFeaturedProjects()
+  const [featuredProjects, banner] = await Promise.all([
+    getFeaturedProjects(),
+    getBannerConfig(),
+  ])
 
   return (
     <>
+      {/* ─── BANNER PUBLICITARIO ───────────────────────────── */}
+      {banner.isActive && banner.imageUrl && (
+        <a href="/#contacto" className="block w-full">
+          <Image
+            src={banner.imageUrl}
+            alt="Banner publicitario UFPlus"
+            width={1920}
+            height={600}
+            className="w-full h-auto object-cover"
+            priority
+          />
+        </a>
+      )}
+
       {/* ─── HERO ──────────────────────────────────────────── */}
       <section className="relative min-h-[720px] flex items-center overflow-hidden bg-[#0D0D0D]">
         {/* Background image */}
