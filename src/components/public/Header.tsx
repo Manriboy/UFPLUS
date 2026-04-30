@@ -21,7 +21,9 @@ export default function Header() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20)
+    const hasBanner = !!document.getElementById('promo-banner')
+    const handleScroll = () => setIsScrolled(hasBanner || window.scrollY > 20)
+    handleScroll()
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])

@@ -157,7 +157,7 @@ export default async function HomePage() {
     <>
       {/* ─── BANNER PUBLICITARIO ───────────────────────────── */}
       {banner.isActive && banner.imageUrl && (
-        <div className="pt-[72px] sm:pt-[80px] lg:pt-[88px]">
+        <div id="promo-banner" className="mt-16 sm:mt-[72px] lg:mt-[88px]">
           <a href="/#contacto" className="block w-full">
             <Image
               src={banner.imageUrl}
