@@ -1,10 +1,10 @@
 'use client'
-// src/components/admin/IrisSearch.tsx
+// src/components/public/IrisSearchPublic.tsx
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
   Search, RefreshCw, MapPin, Calendar, ChevronDown,
-  Home, AlertCircle, FileText, X, KeyRound,
+  Home, AlertCircle, FileText, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
@@ -245,6 +245,20 @@ function TipologiaSelect({ selected, onChange }: {
   )
 }
 
+// ─── Mapeo de estado Iris → etiqueta pública ─────────
+
+function toPublicStatus(status: string | null): string | null {
+  if (!status) return null
+  const s = status.toLowerCase()
+  if (s.includes('pozo') || s.includes('verde') || s.includes('planos') || s.includes('preventa'))
+    return 'En verde'
+  if (s.includes('construc'))
+    return 'En construcción'
+  if (s.includes('estrenar') || s.includes('terminado') || s.includes('entrega') || s.includes('listo') || s.includes('inmediata'))
+    return 'Entrega inmediata'
+  return status
+}
+
 // ─── Helpers de precio ────────────────────────────────
 
 function priceRange(units: IrisUnit[]) {
@@ -293,12 +307,12 @@ function ProjectCard({ project, isExpanded, onToggleUnits }: {
           )}
           {project.pie_bonus && (
             <span className="bg-brand-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-              Bono Pie {project.pie_bonus_conditions}%
+              Apoyo Pie {project.pie_bonus_conditions}%
             </span>
           )}
-          {project.status && (
+          {toPublicStatus(project.status) && (
             <span className="bg-white/90 text-gray-700 text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
-              {project.status}
+              {toPublicStatus(project.status)}
             </span>
           )}
         </div>
@@ -429,7 +443,9 @@ function UnitsPanel({ project, onClose }: { project: IrisProject; onClose: () =>
 
 // ─── Componente principal ─────────────────────────────
 
-export default function IrisSearch() {
+const DEFAULT_REGION = IRIS_REGIONS.find((r) => r.name === 'Metropolitana')!
+
+export default function IrisSearchPublic() {
   const [projects, setProjects] = useState<IrisProject[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -437,8 +453,6 @@ export default function IrisSearch() {
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [tokenExpired, setTokenExpired] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
 
   // Grid responsivo: detectar número de columnas activo
   const gridRef = useRef<HTMLDivElement>(null)
@@ -457,11 +471,11 @@ export default function IrisSearch() {
     return () => ro.disconnect()
   }, [])
 
-  // Filtros
-  const [regionId, setRegionId] = useState<number | ''>('')
-  const [zoneIds, setZoneIds] = useState<number[]>([])
+  // Filtros — Metropolitana pre-seleccionada por defecto
+  const [regionId, setRegionId] = useState<number | ''>(DEFAULT_REGION.id)
+  const [zoneIds, setZoneIds] = useState<number[]>(DEFAULT_REGION.zones.map((z) => z.id))
   const [tipologias, setTipologias] = useState<string[]>([])
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, PRICE_MAX])
+  const [priceRangeVal, setPriceRangeVal] = useState<[number, number]>([0, PRICE_MAX])
   const [bonoPieMin, setBonoPieMin] = useState<string>('')
 
   const selectedRegion = IRIS_REGIONS.find((r) => r.id === regionId)
@@ -493,14 +507,27 @@ export default function IrisSearch() {
     setExpandedId((prev) => (prev === id ? null : id))
   }
 
+  const resetFilters = () => {
+    setRegionId(DEFAULT_REGION.id)
+    setZoneIds(DEFAULT_REGION.zones.map((z) => z.id))
+    setTipologias([])
+    setPriceRangeVal([0, PRICE_MAX])
+    setBonoPieMin('')
+    setProjects([])
+    setSearched(false)
+    setTotal(0)
+    setPage(1)
+    setExpandedId(null)
+    setError('')
+  }
+
   const search = useCallback(async (p: number = 1) => {
     if (!canSearch) return
     setLoading(true)
     setError('')
-    setTokenExpired(false)
     setExpandedId(null)
     try {
-      const res = await fetch('/api/admin/iris/search', {
+      const res = await fetch('/api/iris/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -509,16 +536,19 @@ export default function IrisSearch() {
             project_status: [1, 2, 3],
             zone_ids: zoneIds,
             tipologias: tipologias.length > 0 ? tipologias : undefined,
-            price_min: priceRange[0] > 0 ? priceRange[0] : undefined,
-            price_max: priceRange[1] < PRICE_MAX ? priceRange[1] : undefined,
+            price_min: priceRangeVal[0] > 0 ? priceRangeVal[0] : undefined,
+            price_max: priceRangeVal[1] < PRICE_MAX ? priceRangeVal[1] : undefined,
             pie_bonus_min: bonoPieMin ? parseFloat(bonoPieMin) : undefined,
           },
         }),
       })
       const data = await res.json()
       if (!res.ok) {
-        if (res.status === 401) setTokenExpired(true)
-        setError(data.error ?? 'Error al consultar')
+        if (res.status === 401 || res.status === 503) {
+          setError('Servicio temporalmente no disponible')
+        } else {
+          setError(data.error ?? 'Error al consultar, intenta más tarde')
+        }
         return
       }
       setProjects(data.projects ?? [])
@@ -526,43 +556,26 @@ export default function IrisSearch() {
       setPage(p)
       setSearched(true)
     } catch {
-      setError('Error de red al conectar')
+      setError('Error al consultar, intenta más tarde')
     } finally {
       setLoading(false)
     }
-  }, [canSearch, zoneIds, tipologias, priceRange, bonoPieMin])
-
-  const handleRefreshToken = async () => {
-    setRefreshing(true)
-    try {
-      const res = await fetch('/api/admin/iris/refresh-token', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Error al renovar token'); return }
-      setTokenExpired(false)
-      setError('')
-      // Reintentar la búsqueda automáticamente
-      await search(page)
-    } catch {
-      setError('Error de red al renovar token')
-    } finally {
-      setRefreshing(false)
-    }
-  }
+  }, [canSearch, zoneIds, tipologias, priceRangeVal, bonoPieMin])
 
   const handlePriceInput = (side: 'min' | 'max', raw: string) => {
     const v = Math.max(0, Math.min(PRICE_MAX, parseInt(raw) || 0))
-    if (side === 'min') setPriceRange([Math.min(v, priceRange[1] - PRICE_STEP), priceRange[1]])
-    else setPriceRange([priceRange[0], v])
+    if (side === 'min') setPriceRangeVal([Math.min(v, priceRangeVal[1] - PRICE_STEP), priceRangeVal[1]])
+    else setPriceRangeVal([priceRangeVal[0], v])
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <section className="container-section py-12 space-y-8">
 
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Consulta Stock</h1>
+        <h2 className="text-xl font-bold text-gray-900">Busca tu departamento ideal</h2>
         <p className="text-sm text-gray-500 mt-0.5">
-          Stock disponible{total > 0 && ` · ${total} proyectos encontrados`}
+          Filtra por región, tipo y precio{total > 0 && ` · ${total} proyectos encontrados`}
         </p>
       </div>
 
@@ -605,14 +618,14 @@ export default function IrisSearch() {
           </div>
         </div>
 
-        {/* Fila 2: Tipología + Bono Pie */}
+        {/* Fila 2: Tipología + Apoyo Pie */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">Tipología</label>
             <TipologiaSelect selected={tipologias} onChange={setTipologias} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Bono pie mínimo (%)</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Apoyo pie mínimo (%)</label>
             <div className="flex items-center gap-2">
               <input
                 type="number" min={0} max={100} step={1} value={bonoPieMin}
@@ -634,30 +647,30 @@ export default function IrisSearch() {
           <div className="flex items-center justify-between mb-3">
             <label className="text-xs font-semibold text-gray-700">Rango de precio (UF)</label>
             <span className="text-xs text-gray-500">
-              {priceRange[0] === 0 && priceRange[1] === PRICE_MAX
+              {priceRangeVal[0] === 0 && priceRangeVal[1] === PRICE_MAX
                 ? 'Sin límite'
-                : `${priceRange[0].toLocaleString('es-CL')} – ${priceRange[1].toLocaleString('es-CL')} UF`}
+                : `${priceRangeVal[0].toLocaleString('es-CL')} – ${priceRangeVal[1].toLocaleString('es-CL')} UF`}
             </span>
           </div>
           <div className="px-2 mb-4">
-            <DualRangeSlider values={priceRange} onChange={setPriceRange} />
+            <DualRangeSlider values={priceRangeVal} onChange={setPriceRangeVal} />
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 flex-1">
               <span className="text-xs text-gray-500 whitespace-nowrap">Mín.</span>
-              <input type="number" min={0} max={PRICE_MAX} step={PRICE_STEP} value={priceRange[0]}
+              <input type="number" min={0} max={PRICE_MAX} step={PRICE_STEP} value={priceRangeVal[0]}
                 onChange={(e) => handlePriceInput('min', e.target.value)} className="input-field text-sm text-right" />
               <span className="text-xs text-gray-400">UF</span>
             </div>
             <span className="text-gray-300">—</span>
             <div className="flex items-center gap-1.5 flex-1">
               <span className="text-xs text-gray-500 whitespace-nowrap">Máx.</span>
-              <input type="number" min={0} max={PRICE_MAX} step={PRICE_STEP} value={priceRange[1]}
+              <input type="number" min={0} max={PRICE_MAX} step={PRICE_STEP} value={priceRangeVal[1]}
                 onChange={(e) => handlePriceInput('max', e.target.value)} className="input-field text-sm text-right" />
               <span className="text-xs text-gray-400">UF</span>
             </div>
-            {(priceRange[0] > 0 || priceRange[1] < PRICE_MAX) && (
-              <button type="button" onClick={() => setPriceRange([0, PRICE_MAX])} className="text-gray-400 hover:text-gray-600" title="Limpiar precio">
+            {(priceRangeVal[0] > 0 || priceRangeVal[1] < PRICE_MAX) && (
+              <button type="button" onClick={() => setPriceRangeVal([0, PRICE_MAX])} className="text-gray-400 hover:text-gray-600" title="Limpiar precio">
                 <X className="h-4 w-4" />
               </button>
             )}
@@ -666,11 +679,20 @@ export default function IrisSearch() {
 
         {/* Botón consultar */}
         <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-          <p className="text-xs text-gray-400">
-            {!canSearch
-              ? <span className="text-amber-600">Selecciona una región para consultar</span>
-              : <span className="text-green-600">Listo para consultar</span>}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-gray-400">
+              {!canSearch
+                ? <span className="text-amber-600">Selecciona una región para consultar</span>
+                : <span className="text-green-600">Listo para consultar</span>}
+            </p>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+            >
+              Limpiar selección
+            </button>
+          </div>
           <button
             onClick={() => search(1)}
             disabled={loading || !canSearch}
@@ -684,23 +706,9 @@ export default function IrisSearch() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center justify-between gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <span>{tokenExpired ? 'Token de Consulta Stock expirado — renuévalo desde DevTools' : error}</span>
-          </div>
-          {tokenExpired && (
-            <button
-              onClick={handleRefreshToken}
-              disabled={refreshing}
-              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md transition-colors disabled:opacity-60 whitespace-nowrap"
-            >
-              {refreshing
-                ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Renovando…</>
-                : <><KeyRound className="h-3.5 w-3.5" /> Renovar token</>
-              }
-            </button>
-          )}
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -761,6 +769,6 @@ export default function IrisSearch() {
           <p className="text-sm text-gray-400">Selecciona una región y presiona Consultar</p>
         </div>
       )}
-    </div>
+    </section>
   )
 }

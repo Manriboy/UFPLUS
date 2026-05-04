@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { revalidatePath } from 'next/cache'
 
 export async function PATCH(
   req: NextRequest,
@@ -47,8 +48,12 @@ export async function PATCH(
     const project = await prisma.project.update({
       where: { id: params.id },
       data: updateData,
+      select: { id: true, slug: true, isActive: true, isFeatured: true, isArchived: true },
     })
 
+    revalidatePath('/')
+    revalidatePath('/proyectos')
+    revalidatePath(`/proyectos/${project.slug}`)
     return NextResponse.json(project)
   } catch (error) {
     console.error('Error toggling project:', error)

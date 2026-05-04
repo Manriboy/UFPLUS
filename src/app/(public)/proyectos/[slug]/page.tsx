@@ -63,8 +63,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-// Renderizado dinámico on-demand con caché de 60s (sin pre-generación de fallbacks)
-export const revalidate = 60
+// Caché indefinido — se invalida bajo demanda desde el admin (revalidatePath)
+export const revalidate = false
 export const dynamicParams = true
 
 export default async function ProjectDetailPage({ params }: Props) {

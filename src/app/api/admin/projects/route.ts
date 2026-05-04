@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { projectSchema } from '@/lib/validations'
 import { slugify } from '@/lib/utils'
+import { revalidatePath } from 'next/cache'
 
 export async function GET(req: NextRequest) {
   try {
@@ -101,6 +102,8 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    revalidatePath('/')
+    revalidatePath('/proyectos')
     return NextResponse.json(project, { status: 201 })
   } catch (error) {
     console.error('Error creating project:', error)

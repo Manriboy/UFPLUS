@@ -1,7 +1,5 @@
-// src/app/api/admin/iris/search/route.ts
+// src/app/api/iris/search/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
 
@@ -296,13 +294,10 @@ async function fetchUFPlusProjects(cleanZoneNames: string[]) {
 // ─── POST handler ─────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-
   // Leer token desde BD primero; fallback a variable de entorno
   const dbSetting = await prisma.setting.findUnique({ where: { key: 'iris_token' } })
   const token = dbSetting?.value || process.env.IRIS_BEARER_TOKEN
-  if (!token) return NextResponse.json({ error: 'Token de Iris no configurado' }, { status: 500 })
+  if (!token) return NextResponse.json({ error: 'Servicio temporalmente no disponible' }, { status: 503 })
 
   const body = await req.json()
   const page: number = body.page ?? 1
@@ -334,17 +329,17 @@ export async function POST(req: NextRequest) {
   try {
     firstRes = await fetchIrisPage(1, projectStatus, token)
   } catch {
-    return NextResponse.json({ error: 'Error de conexión con Iris' }, { status: 502 })
+    return NextResponse.json({ error: 'Error al consultar, intenta más tarde' }, { status: 502 })
   }
 
   if (firstRes.status === 401) {
     return NextResponse.json(
-      { error: 'Token de Iris expirado — renuévalo desde DevTools en iris.yapo.cl' },
-      { status: 401 }
+      { error: 'Servicio temporalmente no disponible' },
+      { status: 503 }
     )
   }
   if (!firstRes.ok) {
-    return NextResponse.json({ error: `Iris respondió con error ${firstRes.status}` }, { status: 502 })
+    return NextResponse.json({ error: 'Error al consultar, intenta más tarde' }, { status: 502 })
   }
 
   const firstData = await firstRes.json() as IrisResponse

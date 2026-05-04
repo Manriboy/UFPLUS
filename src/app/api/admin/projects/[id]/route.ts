@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { projectSchema } from '@/lib/validations'
+import { revalidatePath } from 'next/cache'
 
 export async function GET(
   req: NextRequest,
@@ -106,6 +107,9 @@ export async function PUT(
       })
     })
 
+    revalidatePath('/')
+    revalidatePath('/proyectos')
+    revalidatePath(`/proyectos/${project.slug}`)
     return NextResponse.json(project)
   } catch (error) {
     console.error('Error updating project:', error)
@@ -133,6 +137,9 @@ export async function DELETE(
       },
     })
 
+    revalidatePath('/')
+    revalidatePath('/proyectos')
+    revalidatePath(`/proyectos/${project.slug}`)
     return NextResponse.json({ message: 'Proyecto archivado correctamente', project })
   } catch (error) {
     console.error('Error archiving project:', error)

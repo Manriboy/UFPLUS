@@ -1,46 +1,35 @@
 // src/app/(public)/proyectos/page.tsx
-export const revalidate = 3600
 import { Metadata } from 'next'
-import ProjectsClient from './ProjectsClient'
-import prisma from '@/lib/prisma'
+import IrisSearchPublic from '@/components/public/IrisSearchPublic'
 
 export const metadata: Metadata = {
   title: 'Proyectos de Inversión',
   description: 'Explora nuestra selección de departamentos de inversión en Chile. Filtra por ubicación, precio y tipo de entrega.',
 }
 
-async function getInitialData() {
-  const [projects, communes] = await Promise.all([
-    prisma.project.findMany({
-      where: { isActive: true, isArchived: false },
-      select: {
-        id: true, name: true, slug: true, commune: true, city: true,
-        priceFrom: true, currency: true, deliveryType: true,
-        shortDescription: true, isFeatured: true, isActive: true,
-        images: { where: { isMain: true }, take: 1, select: { url: true, alt: true } },
-        typologies: { select: { name: true }, orderBy: { sortOrder: 'asc' } },
-      },
-      orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { publishedAt: 'desc' }],
-    }),
-    prisma.project.findMany({
-      where: { isActive: true, isArchived: false, commune: { not: null } },
-      select: { commune: true },
-      distinct: ['commune'],
-      orderBy: { commune: 'asc' },
-    }),
-  ])
+export default function ProjectsPage() {
+  return (
+    <>
+      {/* Hero negro */}
+      <section className="bg-[#0D0D0D] pt-28 pb-16">
+        <div className="container-section">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-px bg-brand-primary" />
+            <span className="text-brand-primary text-sm font-medium tracking-widest uppercase">
+              Portafolio
+            </span>
+          </div>
+          <h1 className="font-sans text-4xl sm:text-5xl font-bold text-white mb-4">
+            Proyectos de inversión
+          </h1>
+          <p className="text-gray-400 text-lg max-w-xl">
+            Departamentos seleccionados por expertos en las mejores ubicaciones de Chile.
+          </p>
+        </div>
+      </section>
 
-  return {
-    projects,
-    communes: communes.map((c) => c.commune).filter(Boolean) as string[],
-  }
-}
-
-export default async function ProjectsPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | undefined }
-}) {
-  const { projects, communes } = await getInitialData()
-  return <ProjectsClient initialProjects={projects as any} communes={communes} searchParams={searchParams} />
+      {/* Buscador Iris */}
+      <IrisSearchPublic />
+    </>
+  )
 }

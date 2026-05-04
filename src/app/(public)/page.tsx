@@ -1,5 +1,5 @@
 // src/app/(public)/page.tsx
-export const revalidate = 3600 // revalidar cada hora
+export const revalidate = false // solo revalidar bajo demanda (revalidatePath desde admin)
 import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
