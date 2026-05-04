@@ -4,15 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Edit,
-  Eye,
   Archive,
-  Power,
   Star,
-  StarOff,
   Search,
   Loader2,
-  ChevronUp,
-  ChevronDown,
   ExternalLink,
 } from 'lucide-react'
 import { toast } from '@/components/ui/Toast'
@@ -44,7 +39,6 @@ export default function ProjectsTable({ initialFilter, initialSearch }: Props) {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(initialSearch)
   const [searchInput, setSearchInput] = useState(initialSearch)
-  const [filter] = useState(initialFilter)
   const [archiveTarget, setArchiveTarget] = useState<Project | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -52,7 +46,7 @@ export default function ProjectsTable({ initialFilter, initialSearch }: Props) {
   const fetchProjects = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ filter })
+      const params = new URLSearchParams({ filter: initialFilter })
       if (search) params.set('search', search)
       const res = await fetch(`/api/admin/projects?${params}`)
       if (!res.ok) throw new Error()
@@ -63,7 +57,7 @@ export default function ProjectsTable({ initialFilter, initialSearch }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [filter, search])
+  }, [initialFilter, search])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
 
