@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
+import { refreshIrisToken } from '@/lib/iris-token'
 
 const IRIS_URL = 'https://iris-auth.infocasas.com.uy/api/projects/get-projects-search'
 const PAGE_SIZE = 12
@@ -294,10 +295,14 @@ async function fetchUFPlusProjects(cleanZoneNames: string[]) {
 // ─── POST handler ─────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // Leer token desde BD primero; fallback a variable de entorno
+  // Leer token desde BD primero; fallback a variable de entorno; si no hay, renovar automáticamente
   const dbSetting = await prisma.setting.findUnique({ where: { key: 'iris_token' } })
-  const token = dbSetting?.value || process.env.IRIS_BEARER_TOKEN
-  if (!token) return NextResponse.json({ error: 'Servicio temporalmente no disponible' }, { status: 503 })
+  let token: string = dbSetting?.value || process.env.IRIS_BEARER_TOKEN || ''
+  if (!token) {
+    const refreshed = await refreshIrisToken()
+    if (!refreshed) return NextResponse.json({ error: 'Servicio temporalmente no disponible' }, { status: 503 })
+    token = refreshed
+  }
 
   const body = await req.json()
   const page: number = body.page ?? 1
@@ -333,12 +338,21 @@ export async function POST(req: NextRequest) {
   }
 
   if (firstRes.status === 401) {
-    return NextResponse.json(
-      { error: 'Servicio temporalmente no disponible' },
-      { status: 503 }
-    )
-  }
-  if (!firstRes.ok) {
+    // Token expirado — renovar automáticamente y reintentar
+    const newToken = await refreshIrisToken()
+    if (!newToken) {
+      return NextResponse.json({ error: 'Servicio temporalmente no disponible' }, { status: 503 })
+    }
+    token = newToken
+    try {
+      firstRes = await fetchIrisPage(1, projectStatus, token)
+    } catch {
+      return NextResponse.json({ error: 'Error al consultar, intenta más tarde' }, { status: 502 })
+    }
+    if (!firstRes.ok) {
+      return NextResponse.json({ error: 'Servicio temporalmente no disponible' }, { status: 503 })
+    }
+  } else if (!firstRes.ok) {
     return NextResponse.json({ error: 'Error al consultar, intenta más tarde' }, { status: 502 })
   }
 

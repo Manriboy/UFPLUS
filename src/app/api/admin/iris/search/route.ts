@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
+import { refreshIrisToken } from '@/lib/iris-token'
 
 const IRIS_URL = 'https://iris-auth.infocasas.com.uy/api/projects/get-projects-search'
 const PAGE_SIZE = 12
@@ -299,10 +300,14 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  // Leer token desde BD primero; fallback a variable de entorno
+  // Leer token desde BD primero; fallback a variable de entorno; si no hay, renovar automáticamente
   const dbSetting = await prisma.setting.findUnique({ where: { key: 'iris_token' } })
-  const token = dbSetting?.value || process.env.IRIS_BEARER_TOKEN
-  if (!token) return NextResponse.json({ error: 'Token de Iris no configurado' }, { status: 500 })
+  let token: string = dbSetting?.value || process.env.IRIS_BEARER_TOKEN || ''
+  if (!token) {
+    const refreshed = await refreshIrisToken()
+    if (!refreshed) return NextResponse.json({ error: 'Token de Iris no configurado. Verifica las credenciales en variables de entorno.' }, { status: 500 })
+    token = refreshed
+  }
 
   const body = await req.json()
   const page: number = body.page ?? 1
@@ -338,12 +343,27 @@ export async function POST(req: NextRequest) {
   }
 
   if (firstRes.status === 401) {
-    return NextResponse.json(
-      { error: 'Token de Iris expirado — renuévalo desde DevTools en iris.yapo.cl' },
-      { status: 401 }
-    )
-  }
-  if (!firstRes.ok) {
+    // Token expirado — renovar automáticamente y reintentar
+    const newToken = await refreshIrisToken()
+    if (!newToken) {
+      return NextResponse.json(
+        { error: 'Token de Iris expirado. Usa el botón "Renovar token" o verifica las credenciales en variables de entorno.' },
+        { status: 401 }
+      )
+    }
+    token = newToken
+    try {
+      firstRes = await fetchIrisPage(1, projectStatus, token)
+    } catch {
+      return NextResponse.json({ error: 'Error de conexión con Iris' }, { status: 502 })
+    }
+    if (firstRes.status === 401) {
+      return NextResponse.json({ error: 'Token de Iris expirado. Usa el botón "Renovar token".' }, { status: 401 })
+    }
+    if (!firstRes.ok) {
+      return NextResponse.json({ error: `Iris respondió con error ${firstRes.status}` }, { status: 502 })
+    }
+  } else if (!firstRes.ok) {
     return NextResponse.json({ error: `Iris respondió con error ${firstRes.status}` }, { status: 502 })
   }
 

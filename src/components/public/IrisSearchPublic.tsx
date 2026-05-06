@@ -4,7 +4,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
   Search, RefreshCw, MapPin, Calendar, ChevronDown,
-  Home, AlertCircle, FileText, X,
+  Home, AlertCircle, FileText, X, KeyRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
@@ -452,6 +452,8 @@ export default function IrisSearchPublic() {
   const [total, setTotal] = useState(0)
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState('')
+  const [tokenExpired, setTokenExpired] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // Grid responsivo: detectar número de columnas activo
@@ -525,6 +527,7 @@ export default function IrisSearchPublic() {
     if (!canSearch) return
     setLoading(true)
     setError('')
+    setTokenExpired(false)
     setExpandedId(null)
     try {
       const res = await fetch('/api/iris/search', {
@@ -544,11 +547,8 @@ export default function IrisSearchPublic() {
       })
       const data = await res.json()
       if (!res.ok) {
-        if (res.status === 401 || res.status === 503) {
-          setError('Servicio temporalmente no disponible')
-        } else {
-          setError(data.error ?? 'Error al consultar, intenta más tarde')
-        }
+        if (data.tokenExpired) setTokenExpired(true)
+        setError(data.error ?? 'Error al consultar, intenta más tarde')
         return
       }
       setProjects(data.projects ?? [])
@@ -561,6 +561,25 @@ export default function IrisSearchPublic() {
       setLoading(false)
     }
   }, [canSearch, zoneIds, tipologias, priceRangeVal, bonoPieMin])
+
+  const handleRefreshToken = async () => {
+    setRefreshing(true)
+    try {
+      const res = await fetch('/api/admin/iris/refresh-token', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Error al renovar token')
+        return
+      }
+      setTokenExpired(false)
+      setError('')
+      await search(page)
+    } catch {
+      setError('Error de red al renovar token')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const handlePriceInput = (side: 'min' | 'max', raw: string) => {
     const v = Math.max(0, Math.min(PRICE_MAX, parseInt(raw) || 0))
@@ -708,7 +727,19 @@ export default function IrisSearchPublic() {
       {error && (
         <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span>{error}</span>
+          <span className="flex-1">{tokenExpired ? 'Token de Consulta Stock expirado — renuévalo para continuar' : error}</span>
+          {tokenExpired && (
+            <button
+              onClick={handleRefreshToken}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-60 whitespace-nowrap"
+            >
+              {refreshing
+                ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                : <KeyRound className="h-3.5 w-3.5" />}
+              {refreshing ? 'Renovando…' : 'Renovar token'}
+            </button>
+          )}
         </div>
       )}
 
