@@ -465,7 +465,7 @@ export default function IrisSearch() {
   const [bonoPieMin, setBonoPieMin] = useState<string>('')
 
   const selectedRegion = IRIS_REGIONS.find((r) => r.id === regionId)
-  const totalPages = Math.ceil(total / 12)
+  const totalPages = Math.ceil(total / 18)
   const canSearch = regionId !== ''
   const expandedProject = projects.find((p) => String(p.id) === expandedId) ?? null
 

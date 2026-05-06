@@ -5,7 +5,7 @@ import { IRIS_REGIONS } from '@/lib/iris-zones'
 import { refreshIrisToken } from '@/lib/iris-token'
 
 const IRIS_URL = 'https://iris-auth.infocasas.com.uy/api/projects/get-projects-search'
-const PAGE_SIZE = 12
+const PAGE_SIZE = 18
 
 // ─── Tipos internos (Iris) ────────────────────────────
 
