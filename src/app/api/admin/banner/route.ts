@@ -52,14 +52,18 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const [active, imageUrl] = await Promise.all([
+  const [active, imageUrl, linkEnabled, linkUrl] = await Promise.all([
     prisma.setting.findUnique({ where: { key: 'banner_active' } }),
     prisma.setting.findUnique({ where: { key: 'banner_image_url' } }),
+    prisma.setting.findUnique({ where: { key: 'banner_link_enabled' } }),
+    prisma.setting.findUnique({ where: { key: 'banner_link_url' } }),
   ])
 
   return NextResponse.json({
     isActive: active?.value === 'true',
     imageUrl: imageUrl?.value ?? null,
+    isLinkEnabled: linkEnabled?.value === 'true',
+    linkUrl: linkUrl?.value ?? '',
   })
 }
 
@@ -71,6 +75,9 @@ export async function PUT(req: NextRequest) {
 
   const formData = await req.formData()
   const isActive = formData.get('isActive') === 'true'
+  // Si el banner no está activo, el link externo tampoco puede estarlo
+  const isLinkEnabled = isActive && formData.get('isLinkEnabled') === 'true'
+  const linkUrl = (formData.get('linkUrl') as string | null)?.trim() ?? ''
   const file = formData.get('file') as File | null
   let imageUrl = formData.get('imageUrl') as string | null
 
@@ -95,6 +102,16 @@ export async function PUT(req: NextRequest) {
       update: { value: isActive ? 'true' : 'false' },
       create: { key: 'banner_active', value: isActive ? 'true' : 'false' },
     }),
+    prisma.setting.upsert({
+      where: { key: 'banner_link_enabled' },
+      update: { value: isLinkEnabled ? 'true' : 'false' },
+      create: { key: 'banner_link_enabled', value: isLinkEnabled ? 'true' : 'false' },
+    }),
+    prisma.setting.upsert({
+      where: { key: 'banner_link_url' },
+      update: { value: linkUrl },
+      create: { key: 'banner_link_url', value: linkUrl },
+    }),
     imageUrl
       ? prisma.setting.upsert({
           where: { key: 'banner_image_url' },
@@ -104,8 +121,7 @@ export async function PUT(req: NextRequest) {
       : Promise.resolve(),
   ])
 
-  // Revalidar homepage para que refleje el cambio inmediatamente
   revalidatePath('/')
 
-  return NextResponse.json({ success: true, isActive, imageUrl })
+  return NextResponse.json({ success: true, isActive, imageUrl, isLinkEnabled, linkUrl })
 }

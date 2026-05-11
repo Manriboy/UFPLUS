@@ -26,13 +26,17 @@ export const metadata: Metadata = {
 }
 
 async function getBannerConfig() {
-  const [active, imageUrl] = await Promise.all([
+  const [active, imageUrl, linkEnabled, linkUrl] = await Promise.all([
     prisma.setting.findUnique({ where: { key: 'banner_active' } }),
     prisma.setting.findUnique({ where: { key: 'banner_image_url' } }),
+    prisma.setting.findUnique({ where: { key: 'banner_link_enabled' } }),
+    prisma.setting.findUnique({ where: { key: 'banner_link_url' } }),
   ])
   return {
     isActive: active?.value === 'true',
     imageUrl: imageUrl?.value ?? null,
+    isLinkEnabled: linkEnabled?.value === 'true',
+    linkUrl: linkUrl?.value ?? '',
   }
 }
 
@@ -158,16 +162,29 @@ export default async function HomePage() {
       {/* ─── BANNER PUBLICITARIO ───────────────────────────── */}
       {banner.isActive && banner.imageUrl && (
         <div id="promo-banner" className="mt-16 sm:mt-[72px] lg:mt-[88px]">
-          <a href="/#contacto" className="block w-full">
-            <Image
-              src={banner.imageUrl}
-              alt="Banner publicitario UFPlus"
-              width={1920}
-              height={600}
-              className="w-full h-auto object-cover"
-              priority
-            />
-          </a>
+          {banner.isLinkEnabled && banner.linkUrl ? (
+            <a href={banner.linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
+              <Image
+                src={banner.imageUrl}
+                alt="Banner publicitario UFPlus"
+                width={1920}
+                height={600}
+                className="w-full h-auto object-cover"
+                priority
+              />
+            </a>
+          ) : (
+            <a href="/#contacto" className="block w-full">
+              <Image
+                src={banner.imageUrl}
+                alt="Banner publicitario UFPlus"
+                width={1920}
+                height={600}
+                className="w-full h-auto object-cover"
+                priority
+              />
+            </a>
+          )}
         </div>
       )}
 

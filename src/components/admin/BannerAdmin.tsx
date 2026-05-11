@@ -2,15 +2,22 @@
 // src/components/admin/BannerAdmin.tsx
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import { Upload, X, ImageIcon, Save, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Upload, X, ImageIcon, Save, ToggleLeft, ToggleRight, ExternalLink } from 'lucide-react'
 
 type BannerState = {
   isActive: boolean
   imageUrl: string | null
+  isLinkEnabled: boolean
+  linkUrl: string
 }
 
 export default function BannerAdmin() {
-  const [banner, setBanner] = useState<BannerState>({ isActive: false, imageUrl: null })
+  const [banner, setBanner] = useState<BannerState>({
+    isActive: false,
+    imageUrl: null,
+    isLinkEnabled: false,
+    linkUrl: '',
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
@@ -22,7 +29,12 @@ export default function BannerAdmin() {
     fetch('/api/admin/banner')
       .then((r) => r.json())
       .then((data) => {
-        setBanner({ isActive: data.isActive ?? false, imageUrl: data.imageUrl ?? null })
+        setBanner({
+          isActive: data.isActive ?? false,
+          imageUrl: data.imageUrl ?? null,
+          isLinkEnabled: data.isLinkEnabled ?? false,
+          linkUrl: data.linkUrl ?? '',
+        })
       })
       .finally(() => setLoading(false))
   }, [])
@@ -51,11 +63,27 @@ export default function BannerAdmin() {
     if (f) handleFile(f)
   }
 
+  function toggleActive() {
+    setBanner((b) => ({
+      ...b,
+      isActive: !b.isActive,
+      // Al desactivar el banner, el link externo también se desactiva
+      isLinkEnabled: b.isActive ? false : b.isLinkEnabled,
+    }))
+  }
+
+  function toggleLinkEnabled() {
+    if (!banner.isActive) return
+    setBanner((b) => ({ ...b, isLinkEnabled: !b.isLinkEnabled }))
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
       const form = new FormData()
       form.append('isActive', banner.isActive ? 'true' : 'false')
+      form.append('isLinkEnabled', banner.isLinkEnabled ? 'true' : 'false')
+      form.append('linkUrl', banner.linkUrl)
       if (file) form.append('file', file)
       if (banner.imageUrl && !file) form.append('imageUrl', banner.imageUrl)
 
@@ -65,7 +93,12 @@ export default function BannerAdmin() {
         showToast(data.error || 'Error al guardar', false)
         return
       }
-      setBanner({ isActive: data.isActive, imageUrl: data.imageUrl })
+      setBanner({
+        isActive: data.isActive,
+        imageUrl: data.imageUrl,
+        isLinkEnabled: data.isLinkEnabled,
+        linkUrl: data.linkUrl ?? '',
+      })
       setFile(null)
       setPreview(null)
       showToast('Banner guardado correctamente', true)
@@ -94,7 +127,7 @@ export default function BannerAdmin() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Toast */}
       {toast && (
         <div
@@ -114,7 +147,7 @@ export default function BannerAdmin() {
         </p>
         <button
           type="button"
-          onClick={() => setBanner((b) => ({ ...b, isActive: !b.isActive }))}
+          onClick={toggleActive}
           className="flex items-center gap-3 group"
         >
           {banner.isActive ? (
@@ -122,12 +155,69 @@ export default function BannerAdmin() {
           ) : (
             <ToggleLeft className="w-10 h-10 text-gray-300" />
           )}
-          <span
-            className={`text-sm font-medium ${banner.isActive ? 'text-brand-primary' : 'text-gray-400'}`}
-          >
+          <span className={`text-sm font-medium ${banner.isActive ? 'text-brand-primary' : 'text-gray-400'}`}>
             {banner.isActive ? 'Activo — visible en el sitio' : 'Inactivo — oculto en el sitio'}
           </span>
         </button>
+      </div>
+
+      {/* Toggle link externo */}
+      <div className={`bg-white border rounded-lg p-6 transition-opacity ${!banner.isActive ? 'opacity-50 pointer-events-none' : 'border-gray-200'}`}>
+        <h2 className="text-base font-semibold text-gray-800 mb-1">Link externo</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Al activar esta opción, el banner abrirá un link externo en una nueva ventana en lugar de ir al formulario de contacto.
+          {!banner.isActive && <span className="ml-1 text-amber-600 font-medium">Requiere que el banner esté activo.</span>}
+        </p>
+
+        <button
+          type="button"
+          onClick={toggleLinkEnabled}
+          disabled={!banner.isActive}
+          className="flex items-center gap-3 group disabled:cursor-not-allowed"
+        >
+          {banner.isLinkEnabled ? (
+            <ToggleRight className="w-10 h-10 text-brand-primary" />
+          ) : (
+            <ToggleLeft className="w-10 h-10 text-gray-300" />
+          )}
+          <span className={`text-sm font-medium ${banner.isLinkEnabled ? 'text-brand-primary' : 'text-gray-400'}`}>
+            {banner.isLinkEnabled ? 'Link externo activo' : 'Link externo inactivo — abre formulario de contacto'}
+          </span>
+        </button>
+
+        {/* Input de URL — visible solo cuando el link externo está habilitado */}
+        {banner.isLinkEnabled && (
+          <div className="mt-4">
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              URL del link externo
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <ExternalLink className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="url"
+                  value={banner.linkUrl}
+                  onChange={(e) => setBanner((b) => ({ ...b, linkUrl: e.target.value }))}
+                  placeholder="https://ejemplo.com/formulario"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                />
+              </div>
+              {banner.linkUrl && (
+                <a
+                  href={banner.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-brand-primary hover:underline whitespace-nowrap"
+                >
+                  Probar link
+                </a>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              Al hacer click en el banner, el usuario será redirigido a esta URL en una nueva pestaña.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Upload de imagen */}
@@ -193,7 +283,6 @@ export default function BannerAdmin() {
           </button>
         )}
       </div>
-
 
       {/* Botón guardar */}
       <div className="flex justify-end">
