@@ -161,7 +161,7 @@ export default async function HomePage() {
     <>
       {/* ─── BANNER PUBLICITARIO ───────────────────────────── */}
       {banner.isActive && banner.imageUrl && (
-        <div id="promo-banner" className="mt-16 sm:mt-[72px] lg:mt-[88px]">
+        <div id="promo-banner" className="mt-[84px] sm:mt-[72px] lg:mt-[88px]">
           {banner.isLinkEnabled && banner.linkUrl ? (
             <a href={banner.linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
               <Image
