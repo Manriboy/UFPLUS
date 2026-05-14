@@ -2,12 +2,15 @@
 // src/components/admin/IrisSearch.tsx
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import {
   Search, RefreshCw, MapPin, Calendar, ChevronDown,
-  Home, AlertCircle, FileText, X, KeyRound,
+  Home, AlertCircle, FileText, X, KeyRound, Map,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
+
+const ProjectMap = dynamic(() => import('./ProjectMap'), { ssr: false })
 
 // ─── Tipos ───────────────────────────────────────────
 
@@ -46,6 +49,8 @@ interface IrisProject {
   zone: { id: number; name: string } | null
   department: string | null
   status: string | null
+  lat: number | null
+  lng: number | null
   units: IrisUnit[]
 }
 
@@ -465,6 +470,8 @@ export default function IrisSearch() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [tokenExpired, setTokenExpired] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showMap, setShowMap] = useState(false)
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(null)
 
   // Grid responsivo: detectar número de columnas activo
   const gridRef = useRef<HTMLDivElement>(null)
@@ -494,13 +501,27 @@ export default function IrisSearch() {
   const canSearch = regionId !== ''
   const expandedProject = projects.find((p) => String(p.id) === expandedId) ?? null
 
+  // Proyectos con coordenadas (para el mapa)
+  const mapProjects = useMemo(
+    () => projects.filter((p): p is IrisProject & { lat: number; lng: number } =>
+      p.lat !== null && p.lng !== null
+    ),
+    [projects]
+  )
+
+  // Proyectos visibles en la grilla (filtrado por pin seleccionado)
+  const visibleProjects = useMemo(
+    () => selectedMapId ? projects.filter((p) => String(p.id) === selectedMapId) : projects,
+    [projects, selectedMapId]
+  )
+
   // Índice del grid tras el cual insertar el panel (último de la misma fila)
   const panelInsertAfter = useMemo(() => {
     if (!expandedId || !expandedProject) return -1
-    const idx = projects.findIndex((p) => String(p.id) === expandedId)
+    const idx = visibleProjects.findIndex((p) => String(p.id) === expandedId)
     if (idx < 0) return -1
-    return Math.min(Math.ceil((idx + 1) / numCols) * numCols - 1, projects.length - 1)
-  }, [expandedId, expandedProject, projects, numCols])
+    return Math.min(Math.ceil((idx + 1) / numCols) * numCols - 1, visibleProjects.length - 1)
+  }, [expandedId, expandedProject, visibleProjects, numCols])
 
   // Al cambiar región, pre-seleccionar TODAS las comunas de esa región
   const handleRegionChange = (id: number | '') => {
@@ -524,6 +545,7 @@ export default function IrisSearch() {
     setError('')
     setTokenExpired(false)
     setExpandedId(null)
+    setSelectedMapId(null)
     try {
       const res = await fetch('/api/admin/iris/search', {
         method: 'POST',
@@ -733,13 +755,51 @@ export default function IrisSearch() {
             <p className="text-sm text-gray-500">
               {projects.length === 0
                 ? 'Sin proyectos con los filtros aplicados'
+                : selectedMapId
+                ? `1 proyecto seleccionado · ${total} encontrados`
                 : `${total} proyectos encontrados`}
             </p>
+            {projects.length > 0 && mapProjects.length > 0 && (
+              <div className="flex items-center gap-2">
+                {selectedMapId && (
+                  <button
+                    onClick={() => setSelectedMapId(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                  >
+                    <X className="h-3 w-3" /> Mostrar todos
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowMap((v) => !v)}
+                  className={cn(
+                    'flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors',
+                    showMap
+                      ? 'bg-brand-primary text-white border-brand-primary'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-brand-primary hover:text-brand-primary'
+                  )}
+                >
+                  <Map className="h-3.5 w-3.5" />
+                  {showMap ? 'Ocultar mapa' : 'Ver mapa'}
+                </button>
+              </div>
+            )}
           </div>
 
-          {projects.length > 0 && (
+          {/* Mapa */}
+          {showMap && mapProjects.length > 0 && (
+            <ProjectMap
+              projects={mapProjects}
+              selectedId={selectedMapId}
+              onSelect={(id) => {
+                setSelectedMapId(id)
+                setExpandedId(null)
+              }}
+            />
+          )}
+
+          {visibleProjects.length > 0 && (
             <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projects.flatMap((p, i) => {
+              {visibleProjects.flatMap((p, i) => {
                 const card = (
                   <ProjectCard
                     key={p.id}

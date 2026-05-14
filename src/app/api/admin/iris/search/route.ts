@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { IRIS_REGIONS } from '@/lib/iris-zones'
+import { IRIS_REGIONS, ZONE_COORDS } from '@/lib/iris-zones'
 import { refreshIrisToken } from '@/lib/iris-token'
 
 const IRIS_URL = 'https://iris-auth.infocasas.com.uy/api/projects/get-projects-search'
@@ -53,6 +53,7 @@ type MappedProject = {
   images: string[]; brochure: string | null
   zone: { id: number; name: string } | null
   department: string | null; status: string | null
+  lat: number | null; lng: number | null
   units: MappedUnit[]
 }
 
@@ -167,7 +168,29 @@ async function fetchIrisPage(page: number, projectStatus: number[], token: strin
 
 // ─── Mapeo Iris → MappedProject ───────────────────────
 
+function zoneCoords(zoneId: number | null | undefined): { lat: number | null; lng: number | null } {
+  if (!zoneId) return { lat: null, lng: null }
+  const c = ZONE_COORDS[zoneId]
+  return c ? { lat: c[0], lng: c[1] } : { lat: null, lng: null }
+}
+
+function communeCoords(commune: string | null | undefined): { lat: number | null; lng: number | null } {
+  if (!commune) return { lat: null, lng: null }
+  const lower = commune.toLowerCase().trim()
+  for (const region of IRIS_REGIONS) {
+    const zone = region.zones.find((z) =>
+      z.name.toLowerCase().includes(lower) || lower.includes(z.name.toLowerCase())
+    )
+    if (zone && ZONE_COORDS[zone.id]) {
+      const c = ZONE_COORDS[zone.id]
+      return { lat: c[0], lng: c[1] }
+    }
+  }
+  return { lat: null, lng: null }
+}
+
 function mapIrisProject(p: IrisRawProject): MappedProject {
+  const coords = zoneCoords(p.zone?.id)
   return {
     id: p.id,
     source: 'iris',
@@ -182,6 +205,8 @@ function mapIrisProject(p: IrisRawProject): MappedProject {
     zone: p.zone ? { id: p.zone.id, name: p.zone.name } : null,
     department: p.department?.name ?? null,
     status: p.status?.name ?? null,
+    lat: coords.lat,
+    lng: coords.lng,
     // commission omitida intencionalmente — no se expone al cliente
     units: (p.units ?? []).map((u) => ({
       id: u.id,
@@ -261,6 +286,7 @@ function mapUFPlusProject(p: UFPlusProject): MappedProject {
         plan: '',
       }))
 
+  const coords = communeCoords(p.commune)
   return {
     id: `ufplus-${p.id}`,
     source: 'ufplus',
@@ -275,6 +301,8 @@ function mapUFPlusProject(p: UFPlusProject): MappedProject {
     zone: p.commune ? { id: 0, name: p.commune } : null,
     department: p.region ?? null,
     status: deliveryTypeToStatus(p.deliveryType),
+    lat: coords.lat,
+    lng: coords.lng,
     units: unitsMapped,
   }
 }
