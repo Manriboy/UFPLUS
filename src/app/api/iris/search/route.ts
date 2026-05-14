@@ -46,6 +46,7 @@ type MappedUnit = {
 type MappedProject = {
   id: string | number
   source: 'iris' | 'ufplus'
+  slug: string | null
   title: string; address: string; handover_date_text: string
   pie_bonus: boolean; pie_bonus_conditions: string | null; deposit: string | null
   images: string[]; brochure: string | null
@@ -169,6 +170,7 @@ function mapIrisProject(p: IrisRawProject): MappedProject {
   return {
     id: p.id,
     source: 'iris',
+    slug: null,
     title: p.title,
     address: p.address,
     handover_date_text: p.handover_date_text,
@@ -256,6 +258,7 @@ function mapUFPlusProject(p: UFPlusProject): MappedProject {
   return {
     id: `ufplus-${p.id}`,
     source: 'ufplus',
+    slug: p.slug,
     title: p.name,
     address: p.address ?? '',
     handover_date_text: deliveryTypeToText(p.deliveryType),

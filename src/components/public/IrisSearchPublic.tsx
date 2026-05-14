@@ -33,6 +33,7 @@ interface IrisUnit {
 interface IrisProject {
   id: string | number
   source: 'iris' | 'ufplus'
+  slug: string | null
   title: string
   address: string
   handover_date_text: string
@@ -339,6 +340,12 @@ function ProjectCard({ project, isExpanded, onToggleUnits }: {
           <a href={project.brochure} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-brand-primary hover:underline mb-3">
             <FileText className="h-3 w-3" /> Brochure
+          </a>
+        )}
+        {project.source === 'ufplus' && project.slug && (
+          <a href={`/proyectos/${project.slug}`} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-brand-primary hover:underline mb-3">
+            <FileText className="h-3 w-3" /> Ver proyecto
           </a>
         )}
         {project.units.length > 0 && (
