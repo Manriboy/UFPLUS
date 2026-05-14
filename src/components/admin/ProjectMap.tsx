@@ -77,12 +77,22 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
       }).addTo(map)
 
       mapRef.current = map
+
+      // Forzar recálculo de tamaño para evitar mapa gris en primer render
+      requestAnimationFrame(() => map.invalidateSize())
+
+      // Re-invalidar si el contenedor cambia de tamaño (ej: toggle visibilidad)
+      const ro = new ResizeObserver(() => map.invalidateSize())
+      ro.observe(containerRef.current!)
+      ;(map as unknown as Record<string, unknown>).__ro = ro
     })
 
     return () => {
       const map = mapRef.current
       // eslint-disable-next-line react-hooks/exhaustive-deps
       const markers = markersRef.current
+      const ro = map ? (map as unknown as Record<string, unknown>).__ro as ResizeObserver | undefined : undefined
+      ro?.disconnect()
       map?.remove()
       mapRef.current = null
       markers.clear()

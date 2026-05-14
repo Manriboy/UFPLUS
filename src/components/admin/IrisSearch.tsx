@@ -470,7 +470,7 @@ export default function IrisSearch() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [tokenExpired, setTokenExpired] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [showMap, setShowMap] = useState(false)
+  const [showMap, setShowMap] = useState(true)
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null)
 
   // Grid responsivo: detectar número de columnas activo
