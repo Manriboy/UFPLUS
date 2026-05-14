@@ -316,7 +316,6 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const page: number = body.page ?? 1
   const filter = body.filter ?? {}
   const projectStatus: number[] = filter.project_status ?? [1, 2, 3]
   const zoneIds: number[] = filter.zone_ids ?? []
@@ -499,9 +498,5 @@ export async function POST(req: NextRequest) {
     }
   })
 
-  const totalCombined = combined.length
-  const start = (page - 1) * PAGE_SIZE
-  const paginated = combined.slice(start, start + PAGE_SIZE)
-
-  return NextResponse.json({ projects: paginated, total: totalCombined, page })
+  return NextResponse.json({ projects: combined, total: combined.length })
 }

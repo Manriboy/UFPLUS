@@ -459,7 +459,6 @@ function UnitsPanel({ project, onClose }: { project: IrisProject; onClose: () =>
 export default function IrisSearch() {
   const [projects, setProjects] = useState<IrisProject[]>([])
   const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState('')
@@ -492,7 +491,6 @@ export default function IrisSearch() {
   const [bonoPieMin, setBonoPieMin] = useState<string>('')
 
   const selectedRegion = IRIS_REGIONS.find((r) => r.id === regionId)
-  const totalPages = Math.ceil(total / 18)
   const canSearch = regionId !== ''
   const expandedProject = projects.find((p) => String(p.id) === expandedId) ?? null
 
@@ -520,7 +518,7 @@ export default function IrisSearch() {
     setExpandedId((prev) => (prev === id ? null : id))
   }
 
-  const search = useCallback(async (p: number = 1) => {
+  const search = useCallback(async () => {
     if (!canSearch) return
     setLoading(true)
     setError('')
@@ -531,7 +529,6 @@ export default function IrisSearch() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          page: p,
           filter: {
             project_status: [1, 2, 3],
             zone_ids: zoneIds,
@@ -550,7 +547,6 @@ export default function IrisSearch() {
       }
       setProjects(data.projects ?? [])
       setTotal(data.total ?? 0)
-      setPage(p)
       setSearched(true)
     } catch {
       setError('Error de red al conectar')
@@ -567,8 +563,7 @@ export default function IrisSearch() {
       if (!res.ok) { setError(data.error ?? 'Error al renovar token'); return }
       setTokenExpired(false)
       setError('')
-      // Reintentar la búsqueda automáticamente
-      await search(page)
+      await search()
     } catch {
       setError('Error de red al renovar token')
     } finally {
@@ -699,7 +694,7 @@ export default function IrisSearch() {
               : <span className="text-green-600">Listo para consultar</span>}
           </p>
           <button
-            onClick={() => search(1)}
+            onClick={() => search()}
             disabled={loading || !canSearch}
             className={cn('btn-primary flex items-center gap-2 text-sm', (!canSearch || loading) && 'opacity-50 cursor-not-allowed')}
           >
@@ -738,21 +733,8 @@ export default function IrisSearch() {
             <p className="text-sm text-gray-500">
               {projects.length === 0
                 ? 'Sin proyectos con los filtros aplicados'
-                : `Página ${page} de ${totalPages} · ${total} proyectos encontrados`}
+                : `${total} proyectos encontrados`}
             </p>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <button onClick={() => search(page - 1)} disabled={page <= 1 || loading}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                  ← Anterior
-                </button>
-                <span className="text-xs text-gray-400">{page} / {totalPages}</span>
-                <button onClick={() => search(page + 1)} disabled={page >= totalPages || loading}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                  Siguiente →
-                </button>
-              </div>
-            )}
           </div>
 
           {projects.length > 0 && (
