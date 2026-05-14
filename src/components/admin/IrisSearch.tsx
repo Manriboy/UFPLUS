@@ -19,8 +19,10 @@ interface IrisUnit {
   bedrooms: number
   bathrooms: number
   m2: number
+  m2_outdoor: number
   price: number
   final_price: number
+  max_discount: string | null
   currency: string
   floor: string
   orientation: string | null
@@ -345,7 +347,19 @@ function ProjectCard({ project, isExpanded, onToggleUnits }: {
 
 // ─── UnitsPanel (tabla a ancho completo) ─────────────
 
-type SortKey = 'description' | 'db' | 'm2' | 'price' | 'floor' | 'orientation'
+type SortKey = 'description' | 'tipologia' | 'm2' | 'm2_outdoor' | 'price' | 'final_price' | 'discount' | 'floor' | 'orientation'
+
+function formatDiscount(v: string | null): string {
+  if (v == null) return '—'
+  const num = parseFloat(v)
+  if (isNaN(num)) return '—'
+  return `${num % 1 === 0 ? num.toFixed(0) : num.toFixed(1)}%`
+}
+
+function tipologiaLabel(u: IrisUnit): string {
+  if (u.bedrooms === 0) return 'Estudio'
+  return `${u.bedrooms}D/${u.bathrooms}B`
+}
 
 function UnitsPanel({ project, onClose }: { project: IrisProject; onClose: () => void }) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
@@ -360,10 +374,13 @@ function UnitsPanel({ project, onClose }: { project: IrisProject; onClose: () =>
     if (!sortKey) return 0
     const dir = sortDir === 'asc' ? 1 : -1
     switch (sortKey) {
-      case 'description': return dir * (a.description || a.tipology).localeCompare(b.description || b.tipology)
-      case 'db': return dir * ((a.bedrooms * 10 + a.bathrooms) - (b.bedrooms * 10 + b.bathrooms))
+      case 'description': return dir * (a.number ?? a.description).localeCompare(b.number ?? b.description)
+      case 'tipologia': return dir * ((a.bedrooms * 10 + a.bathrooms) - (b.bedrooms * 10 + b.bathrooms))
       case 'm2': return dir * (a.m2 - b.m2)
-      case 'price': return dir * ((a.final_price || a.price) - (b.final_price || b.price))
+      case 'm2_outdoor': return dir * (a.m2_outdoor - b.m2_outdoor)
+      case 'price': return dir * (a.price - b.price)
+      case 'final_price': return dir * (a.final_price - b.final_price)
+      case 'discount': return dir * (parseFloat(a.max_discount ?? '0') - parseFloat(b.max_discount ?? '0'))
       case 'floor': return dir * (a.floor || '').localeCompare(b.floor || '', undefined, { numeric: true })
       case 'orientation': return dir * (a.orientation || '').localeCompare(b.orientation || '')
       default: return 0
@@ -400,9 +417,12 @@ function UnitsPanel({ project, onClose }: { project: IrisProject; onClose: () =>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100 text-xs">
               <SortTh col="description" label="Unidad" />
-              <SortTh col="db" label="D/B" />
-              <SortTh col="m2" label="m²" align="right" />
+              <SortTh col="tipologia" label="Tipología" />
+              <SortTh col="m2" label="M2 total" align="right" />
+              <SortTh col="m2_outdoor" label="M2 terraza" align="right" />
               <SortTh col="price" label="Precio UF" align="right" />
+              <SortTh col="final_price" label="Precio final" align="right" />
+              <SortTh col="discount" label="Descuento" align="right" />
               <SortTh col="floor" label="Piso" />
               <SortTh col="orientation" label="Orientación" />
             </tr>
@@ -411,10 +431,17 @@ function UnitsPanel({ project, onClose }: { project: IrisProject; onClose: () =>
             {sortedUnits.map((u) => (
               <tr key={u.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2 text-gray-700 font-medium">{u.number ?? u.description}</td>
-                <td className="px-4 py-2 text-gray-600">{u.bedrooms}D/{u.bathrooms}B</td>
+                <td className="px-4 py-2 text-gray-600">{tipologiaLabel(u)}</td>
                 <td className="px-4 py-2 text-right text-gray-600">{u.m2.toFixed(1)}</td>
+                <td className="px-4 py-2 text-right text-gray-600">{u.m2_outdoor > 0 ? u.m2_outdoor.toFixed(1) : '—'}</td>
                 <td className="px-4 py-2 text-right font-semibold text-brand-primary">
-                  {(u.final_price || u.price).toLocaleString('es-CL')}
+                  {u.price.toLocaleString('es-CL')}
+                </td>
+                <td className="px-4 py-2 text-right font-semibold text-green-700">
+                  {u.final_price ? u.final_price.toLocaleString('es-CL') : '—'}
+                </td>
+                <td className="px-4 py-2 text-right text-gray-600">
+                  {formatDiscount(u.max_discount)}
                 </td>
                 <td className="px-4 py-2 text-gray-500">{u.floor || '—'}</td>
                 <td className="px-4 py-2 text-gray-500">{u.orientation || '—'}</td>

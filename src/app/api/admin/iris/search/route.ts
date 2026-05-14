@@ -14,7 +14,7 @@ const PAGE_SIZE = 18
 type IrisRawUnit = {
   id: number; number: string | null; description: string; tipology: string
   bedrooms: number; bathrooms: number; m2: number; m2_outdoor: number
-  price: number; final_price: number; currency: string; floor: string
+  price: number; final_price: number; max_discount: string | null; currency: string; floor: string
   orientation: string | null; has_balcony: boolean; garages: number
   bonus_pie: number | null; plan: string
 }
@@ -39,8 +39,8 @@ type IrisResponse = {
 
 type MappedUnit = {
   id: string | number; number: string | null; description: string; tipology: string
-  bedrooms: number; bathrooms: number; m2: number
-  price: number; final_price: number; currency: string
+  bedrooms: number; bathrooms: number; m2: number; m2_outdoor: number
+  price: number; final_price: number; max_discount: string | null; currency: string
   floor: string; orientation: string | null; has_balcony: boolean
   garages: number; bonus_pie: number | null; plan: string
 }
@@ -191,8 +191,10 @@ function mapIrisProject(p: IrisRawProject): MappedProject {
       bedrooms: u.bedrooms,
       bathrooms: u.bathrooms,
       m2: u.m2,
+      m2_outdoor: u.m2_outdoor,
       price: u.price,
       final_price: u.final_price,
+      max_discount: u.max_discount ?? null,
       currency: u.currency,
       floor: u.floor,
       orientation: u.orientation,
@@ -224,10 +226,12 @@ function mapUFPlusProject(p: UFPlusProject): MappedProject {
         bedrooms: parseBedroomsFromString(u.tipologia),
         bathrooms: parseBathroomsFromString(u.tipologia),
         m2: u.supTotal ?? u.supInterior ?? 0,
+        m2_outdoor: 0,
         price: u.precioUf ?? 0,
         final_price: u.precioUf
           ? u.descuento ? u.precioUf * (1 - u.descuento / 100) : u.precioUf
           : 0,
+        max_discount: null,
         currency: 'UF',
         floor: u.piso?.toString() ?? '',
         orientation: u.orientacion ?? null,
@@ -244,8 +248,10 @@ function mapUFPlusProject(p: UFPlusProject): MappedProject {
         bedrooms: parseBedroomsFromString(t.name),
         bathrooms: parseBathroomsFromString(t.name),
         m2: t.totalArea ?? t.usefulArea ?? 0,
+        m2_outdoor: 0,
         price: t.priceFrom ?? p.priceFrom ?? 0,
         final_price: t.priceFrom ?? p.priceFrom ?? 0,
+        max_discount: null,
         currency: 'UF',
         floor: '',
         orientation: null,
