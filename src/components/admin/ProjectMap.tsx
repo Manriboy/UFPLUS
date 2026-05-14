@@ -1,7 +1,6 @@
 'use client'
 // src/components/admin/ProjectMap.tsx
 
-import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef } from 'react'
 import type * as Leaflet from 'leaflet'
 
@@ -58,6 +57,20 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
   const lRef = useRef<L | null>(null)
   const markersRef = useRef<Map<string, Leaflet.Marker>>(new Map())
   const cancelRef = useRef(false)
+
+  // ── Inyectar CSS de Leaflet vía CDN (evita romper el bundler de Next.js) ──
+  useEffect(() => {
+    const id = 'leaflet-css'
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link')
+      link.id = id
+      link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='
+      link.crossOrigin = ''
+      document.head.appendChild(link)
+    }
+  }, [])
 
   // ── Inicializar mapa (una sola vez) ──────────────────
   useEffect(() => {
