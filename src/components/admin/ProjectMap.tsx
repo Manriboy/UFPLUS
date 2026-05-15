@@ -2,12 +2,20 @@
 // src/components/admin/ProjectMap.tsx
 
 import { useEffect, useRef } from 'react'
-import type * as Leaflet from 'leaflet'
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
 
-interface MapProject {
+// Fix default icon paths rotos por webpack
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+export interface MapProject {
   id: string | number
   title: string
-  address: string
   lat: number
   lng: number
   source: 'iris' | 'ufplus'
@@ -23,15 +31,16 @@ const PIN_DEFAULT = '#4B4B4B'
 const PIN_SELECTED = '#941914'
 
 function pinSvg(color: string, size: number): string {
+  const h = size * 1.5
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="${size}" height="${size * 1.5}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="${size}" height="${h}">` +
     `<path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24C24 5.373 18.627 0 12 0z" fill="${color}"/>` +
     `<circle cx="12" cy="12" r="5" fill="white"/>` +
     `</svg>`
   )
 }
 
-function makeIcon(L: typeof Leaflet, color: string, size: number) {
+function makeIcon(color: string, size: number) {
   return L.divIcon({
     className: '',
     html: pinSvg(color, size),
@@ -41,7 +50,7 @@ function makeIcon(L: typeof Leaflet, color: string, size: number) {
   })
 }
 
-// Jitter determinista para separar múltiples pines en la misma comuna
+// Jitter determinista para proyectos en la misma comuna
 function jitter(id: string | number, index: number): [number, number] {
   const hash = String(id).split('').reduce((acc, c) => acc + c.charCodeAt(0), index * 31)
   const angle = (hash % 360) * (Math.PI / 180)
@@ -49,178 +58,100 @@ function jitter(id: string | number, index: number): [number, number] {
   return [Math.sin(angle) * radius, Math.cos(angle) * radius]
 }
 
-type L = typeof Leaflet
+// Encuadra el mapa para mostrar todos los pines
+function FitBounds({ projects }: { projects: MapProject[] }) {
+  const map = useMap()
+  const prevCountRef = useRef(0)
 
-export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMapProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<Leaflet.Map | null>(null)
-  const lRef = useRef<L | null>(null)
-  const markersRef = useRef<Map<string, Leaflet.Marker>>(new Map())
-  const cancelRef = useRef(false)
-
-  // ── Inyectar CSS de Leaflet vía CDN (evita romper el bundler de Next.js) ──
   useEffect(() => {
-    const id = 'leaflet-css'
-    if (!document.getElementById(id)) {
-      const link = document.createElement('link')
-      link.id = id
-      link.rel = 'stylesheet'
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='
-      link.crossOrigin = ''
-      document.head.appendChild(link)
-    }
-  }, [])
+    if (projects.length === 0) return
+    if (projects.length === prevCountRef.current) return
+    prevCountRef.current = projects.length
 
-  // ── Inicializar mapa (una sola vez) ──────────────────
-  useEffect(() => {
-    if (!containerRef.current) return
-    cancelRef.current = false
+    const bounds = L.latLngBounds(projects.map((p) => [p.lat, p.lng]))
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
+  }, [map, projects])
 
-    import('leaflet').then((L) => {
-      // Cancelado si el efecto de limpieza corrió antes de resolver (StrictMode)
-      if (cancelRef.current || !containerRef.current) return
-
-      // Evitar doble inicialización si el DOM ya tiene un mapa de Leaflet
-      const container = containerRef.current as HTMLElement & { _leaflet_id?: number }
-      if (container._leaflet_id) {
-        delete container._leaflet_id
-      }
-
-      lRef.current = L
-
-      const map = L.map(containerRef.current, {
-        zoomControl: true,
-        scrollWheelZoom: true,
-        dragging: true,
-        center: [-33.45, -70.67],
-        zoom: 12,
-      })
-
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20,
-      }).addTo(map)
-
-      mapRef.current = map
-
-      // Invalidar tamaño para evitar mapa gris
-      setTimeout(() => { map.invalidateSize() }, 50)
-
-      // Re-invalidar si el contenedor cambia de tamaño
-      const ro = new ResizeObserver(() => { map.invalidateSize() })
-      ro.observe(containerRef.current)
-
-      // Guardar ro en un ref auxiliar para cleanup
-      roRef.current = ro
-
-      // Renderizar marcadores iniciales si ya tenemos proyectos
-      if (projects.length > 0) {
-        renderMarkers(L, map, markersRef.current, projects, selectedId, onSelect)
-      }
-    })
-
-    return () => {
-      cancelRef.current = true
-      roRef.current?.disconnect()
-      roRef.current = null
-      mapRef.current?.remove()
-      mapRef.current = null
-      lRef.current = null
-      markersRef.current.clear()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const roRef = useRef<ResizeObserver | null>(null)
-
-  // ── Actualizar marcadores cuando cambian proyectos ───
-  useEffect(() => {
-    const L = lRef.current
-    const map = mapRef.current
-    if (!L || !map) return
-    renderMarkers(L, map, markersRef.current, projects, selectedId, onSelect)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projects])
-
-  // ── Actualizar colores al cambiar selección ──────────
-  useEffect(() => {
-    const L = lRef.current
-    const map = mapRef.current
-    if (!L || !map) return
-
-    markersRef.current.forEach((marker, id) => {
-      const isSelected = id === selectedId
-      marker.setIcon(makeIcon(L, isSelected ? PIN_SELECTED : PIN_DEFAULT, isSelected ? 32 : 24))
-    })
-
-    if (selectedId) {
-      const marker = markersRef.current.get(selectedId)
-      if (marker) map.panTo(marker.getLatLng(), { animate: true })
-    }
-  }, [selectedId])
-
-  return (
-    <div className="w-full h-[420px] rounded-xl border border-gray-200 overflow-hidden" style={{ zIndex: 0 }}>
-      <div ref={containerRef} className="w-full h-full" />
-    </div>
-  )
+  return null
 }
 
-// ── Función pura de renderizado de marcadores ─────────
+// Centra el mapa en el pin seleccionado
+function PanToSelected({ selectedId, projects }: { selectedId: string | null; projects: MapProject[] }) {
+  const map = useMap()
 
-function renderMarkers(
-  L: L,
-  map: Leaflet.Map,
-  existing: Map<string, Leaflet.Marker>,
-  projects: MapProject[],
-  selectedId: string | null,
-  onSelect: (id: string | null) => void,
-) {
-  const nextIds = new Set(projects.map((p) => String(p.id)))
+  useEffect(() => {
+    if (!selectedId) return
+    const p = projects.find((x) => String(x.id) === selectedId)
+    if (p) map.panTo([p.lat, p.lng], { animate: true })
+  }, [map, selectedId, projects])
 
-  // Eliminar marcadores obsoletos
-  existing.forEach((marker, id) => {
-    if (!nextIds.has(id)) { marker.remove(); existing.delete(id) }
-  })
+  return null
+}
 
-  // Contar proyectos por coordenada base (para jitter)
+export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMapProps) {
+  // Inyectar CSS de Leaflet desde CDN (no via import para no romper el bundler de Next.js)
+  useEffect(() => {
+    const id = 'leaflet-css'
+    if (document.getElementById(id)) return
+    const link = document.createElement('link')
+    link.id = id
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+  }, [])
+
+  // Contar proyectos por coordenada base para jitter
   const coordGroups: Record<string, number> = {}
   const coordKey = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`
 
-  projects.forEach((p) => {
-    const key = coordKey(p.lat, p.lng)
-    const idx = coordGroups[key] ?? 0
-    coordGroups[key] = idx + 1
+  return (
+    <div className="w-full h-[420px] rounded-xl border border-gray-200 overflow-hidden" style={{ zIndex: 0 }}>
+      <MapContainer
+        center={[-33.45, -70.67]}
+        zoom={12}
+        style={{ width: '100%', height: '100%' }}
+        scrollWheelZoom
+        dragging
+        zoomControl
+        attributionControl
+      >
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>'
+          subdomains="abcd"
+          maxZoom={20}
+        />
 
-    const isSelected = String(p.id) === selectedId
-    const [dlat, dlng] = jitter(p.id, idx)
-    const lat = p.lat + dlat
-    const lng = p.lng + dlng
-    const size = isSelected ? 32 : 24
-    const color = isSelected ? PIN_SELECTED : PIN_DEFAULT
-    const icon = makeIcon(L, color, size)
+        <FitBounds projects={projects} />
+        <PanToSelected selectedId={selectedId} projects={projects} />
 
-    const existingMarker = existing.get(String(p.id))
-    if (existingMarker) {
-      existingMarker.setIcon(icon)
-      existingMarker.setLatLng([lat, lng])
-    } else {
-      const marker = L.marker([lat, lng], { icon })
-        .addTo(map)
-        .bindTooltip(p.title, { direction: 'top', offset: [0, -size * 1.5] })
+        {projects.map((p) => {
+          const key = coordKey(p.lat, p.lng)
+          const idx = coordGroups[key] ?? 0
+          coordGroups[key] = idx + 1
 
-      marker.on('click', () => {
-        onSelect(String(p.id) === selectedId ? null : String(p.id))
-      })
-      existing.set(String(p.id), marker)
-    }
-  })
+          const [dlat, dlng] = jitter(p.id, idx)
+          const isSelected = String(p.id) === selectedId
+          const size = isSelected ? 32 : 24
+          const color = isSelected ? PIN_SELECTED : PIN_DEFAULT
+          const icon = makeIcon(color, size)
 
-  // Ajustar vista para mostrar todos los pines
-  if (projects.length > 0) {
-    const bounds = L.latLngBounds(projects.map((p) => [p.lat, p.lng]))
-    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
-  }
+          return (
+            <Marker
+              key={p.id}
+              position={[p.lat + dlat, p.lng + dlng]}
+              icon={icon}
+              eventHandlers={{
+                click: () => onSelect(String(p.id) === selectedId ? null : String(p.id)),
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -size * 1.5]}>
+                {p.title}
+              </Tooltip>
+            </Marker>
+          )
+        })}
+      </MapContainer>
+    </div>
+  )
 }
