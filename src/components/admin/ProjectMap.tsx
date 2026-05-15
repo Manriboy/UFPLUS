@@ -92,13 +92,15 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
       const map = L.map(containerRef.current, {
         zoomControl: true,
         scrollWheelZoom: true,
+        dragging: true,
         center: [-33.45, -70.67],
         zoom: 12,
       })
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 18,
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20,
       }).addTo(map)
 
       mapRef.current = map
@@ -160,11 +162,9 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
   }, [selectedId])
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-[420px] rounded-xl border border-gray-200 overflow-hidden"
-      style={{ zIndex: 0 }}
-    />
+    <div className="w-full h-[420px] rounded-xl border border-gray-200 overflow-hidden" style={{ zIndex: 0 }}>
+      <div ref={containerRef} className="w-full h-full" />
+    </div>
   )
 }
 
