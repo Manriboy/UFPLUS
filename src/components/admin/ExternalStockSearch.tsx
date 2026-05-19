@@ -1,5 +1,4 @@
 'use client'
-// src/components/admin/ExternalStockSearch.tsx
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
@@ -43,6 +42,25 @@ type SearchFilter = {
   priceMax?: number
 }
 
+type JBUnit = {
+  id: string
+  number: string
+  typology: string
+  rooms: number
+  bathrooms: number
+  surfaceInterior: number
+  surfaceTerrace: number
+  surfaceTotal: number
+  facing: string | null
+  price: number
+  finalPrice: number
+  discountRate: number
+  bonoPie: number
+  available: boolean
+  hasParking: boolean
+  hasStorage: boolean
+}
+
 // ─── Helpers ──────────────────────────────────────────
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -69,7 +87,18 @@ const STAGE_COLORS: Record<string, string> = {
   white: 'bg-blue-100 text-blue-800',
 }
 
+const FACING_LABELS: Record<string, string> = {
+  west: 'Poniente',
+  east: 'Oriente',
+  north: 'Norte',
+  south: 'Sur',
+}
+
 const SOURCES = ['jetbrokers', 'brouk', 'iris']
+
+function formatUF(value: number): string {
+  return value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 // ─── MultiSelect comunas ──────────────────────────────
 
@@ -148,14 +177,23 @@ function ComunaMultiSelect({ options, selected, onChange }: {
 
 // ─── ProjectCard ──────────────────────────────────────
 
-function ExternalProjectCard({ project }: { project: ExternalProject }) {
+function ExternalProjectCard({
+  project,
+  onClick,
+}: {
+  project: ExternalProject
+  onClick: (project: ExternalProject) => void
+}) {
   const sourceLabel = SOURCE_LABELS[project.source] ?? project.source
   const sourceColor = SOURCE_COLORS[project.source] ?? 'bg-gray-600 text-white'
   const stageLabel = project.stage ? (STAGE_LABELS[project.stage] ?? project.stage) : null
   const stageColor = project.stage ? (STAGE_COLORS[project.stage] ?? 'bg-gray-100 text-gray-700') : null
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+    <div
+      className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col cursor-pointer"
+      onClick={() => onClick(project)}
+    >
       {/* Imagen */}
       <div className="relative h-44 bg-gray-100 flex-shrink-0">
         {project.imageUrl ? (
@@ -252,6 +290,250 @@ function SkeletonCard() {
   )
 }
 
+// ─── SkeletonRow ──────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse">
+      {Array.from({ length: 9 }).map((_, i) => (
+        <td key={i} className="px-3 py-3">
+          <div className="h-3 bg-gray-200 rounded w-full" />
+        </td>
+      ))}
+    </tr>
+  )
+}
+
+// ─── UnitsModal ───────────────────────────────────────
+
+function UnitsModal({
+  project,
+  units,
+  loading,
+  error,
+  onClose,
+}: {
+  project: ExternalProject
+  units: JBUnit[]
+  loading: boolean
+  error: string | null
+  onClose: () => void
+}) {
+  const sourceLabel = SOURCE_LABELS[project.source] ?? project.source
+  const sourceColor = SOURCE_COLORS[project.source] ?? 'bg-gray-600 text-white'
+  const stageLabel = project.stage ? (STAGE_LABELS[project.stage] ?? project.stage) : null
+  const stageColor = project.stage ? (STAGE_COLORS[project.stage] ?? 'bg-gray-100 text-gray-700') : null
+
+  const uniqueTypologies = Array.from(new Set(units.map((u) => u.typology))).sort()
+  const [activeTypology, setActiveTypology] = useState<string>('all')
+
+  const filtered = activeTypology === 'all' ? units : units.filter((u) => u.typology === activeTypology)
+
+  const priceFrom = units.length > 0 ? Math.min(...units.map((u) => u.finalPrice)) : null
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', sourceColor)}>
+                {sourceLabel}
+              </span>
+              {stageLabel && stageColor && (
+                <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', stageColor)}>
+                  {stageLabel}
+                </span>
+              )}
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 leading-tight">{project.name}</h2>
+            {project.commune && (
+              <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span>{project.commune}</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Subheader */}
+        <div className="flex items-center gap-6 px-6 py-3 bg-gray-50 border-b border-gray-100 flex-shrink-0 flex-wrap">
+          {priceFrom !== null && (
+            <div>
+              <span className="text-xs text-gray-500">Precio desde</span>
+              <p className="text-sm font-bold text-brand-primary">{formatUF(priceFrom)} UF</p>
+            </div>
+          )}
+          {project.developerName && (
+            <div>
+              <span className="text-xs text-gray-500">Inmobiliaria</span>
+              <p className="text-sm font-semibold text-gray-800">{project.developerName}</p>
+            </div>
+          )}
+          {(project.deliveryYear || project.deliveryPeriod) && (
+            <div>
+              <span className="text-xs text-gray-500">Entrega</span>
+              <p className="text-sm font-semibold text-gray-800">
+                {[project.deliveryPeriod, project.deliveryYear].filter(Boolean).join(' ')}
+              </p>
+            </div>
+          )}
+          {!loading && (
+            <div className="ml-auto">
+              <span className="text-xs text-gray-500">{units.length} unidades disponibles</span>
+            </div>
+          )}
+        </div>
+
+        {/* Filtro por tipología */}
+        {!loading && !error && uniqueTypologies.length > 1 && (
+          <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 flex-shrink-0 overflow-x-auto">
+            <button
+              onClick={() => setActiveTypology('all')}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors',
+                activeTypology === 'all'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              Todas
+            </button>
+            {uniqueTypologies.map((typ) => (
+              <button
+                key={typ}
+                onClick={() => setActiveTypology(typ)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors',
+                  activeTypology === typ
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                )}
+              >
+                {typ}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Contenido */}
+        <div className="flex-1 overflow-auto">
+          {loading && (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {['N°', 'Modelo', 'Dorms', 'm² Int', 'm² Terraza', 'Orientación', 'Precio UF', 'Dto %', 'Precio Final UF'].map((col) => (
+                    <th key={col} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
+              </tbody>
+            </table>
+          )}
+
+          {!loading && error && (
+            <div className="flex items-center gap-2 m-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && filtered.length === 0 && (
+            <div className="py-20 text-center">
+              <Home className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">No hay unidades disponibles</p>
+            </div>
+          )}
+
+          {!loading && !error && filtered.length > 0 && (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {['N°', 'Modelo', 'Dorms', 'm² Int', 'm² Terraza', 'Orientación', 'Precio UF', 'Dto %', 'Precio Final UF'].map((col) => (
+                    <th key={col} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map((unit) => (
+                  <tr key={unit.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2.5 font-mono text-xs text-gray-700">{unit.number}</td>
+                    <td className="px-3 py-2.5">
+                      <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                        {unit.typology}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-700">{unit.rooms}</td>
+                    <td className="px-3 py-2.5 text-gray-700">{unit.surfaceInterior.toFixed(2)}</td>
+                    <td className="px-3 py-2.5 text-gray-700">{unit.surfaceTerrace.toFixed(2)}</td>
+                    <td className="px-3 py-2.5 text-gray-500 text-xs">
+                      {unit.facing ? (FACING_LABELS[unit.facing] ?? unit.facing) : '—'}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {unit.discountRate > 0 ? (
+                        <span className="text-xs text-gray-400 line-through">
+                          {formatUF(unit.price)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-700">{formatUF(unit.price)}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {unit.discountRate > 0 ? (
+                        <span className="text-xs font-semibold text-emerald-600">
+                          {unit.discountRate.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={cn(
+                        'font-semibold',
+                        unit.discountRate > 0 ? 'text-emerald-600' : 'text-gray-900'
+                      )}>
+                        {formatUF(unit.finalPrice)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Componente principal ─────────────────────────────
 
 export default function ExternalStockSearch() {
@@ -271,6 +553,11 @@ export default function ExternalStockSearch() {
   const [selectedStage, setSelectedStage] = useState('')
   const [priceMin, setPriceMin] = useState('')
   const [priceMax, setPriceMax] = useState('')
+
+  const [selectedProject, setSelectedProject] = useState<ExternalProject | null>(null)
+  const [units, setUnits] = useState<JBUnit[]>([])
+  const [loadingUnits, setLoadingUnits] = useState(false)
+  const [unitsError, setUnitsError] = useState<string | null>(null)
 
   const buildFilter = useCallback((): SearchFilter => {
     const filter: SearchFilter = {}
@@ -324,6 +611,27 @@ export default function ExternalStockSearch() {
       setSyncError('Error de red al sincronizar')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  async function handleProjectClick(project: ExternalProject) {
+    setSelectedProject(project)
+    setUnits([])
+    setUnitsError(null)
+    setLoadingUnits(true)
+    try {
+      const res = await fetch('/api/admin/external/units', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: project.id, sourceId: project.sourceId, source: project.source }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error cargando unidades')
+      setUnits(data.units)
+    } catch (e) {
+      setUnitsError(e instanceof Error ? e.message : 'Error desconocido')
+    } finally {
+      setLoadingUnits(false)
     }
   }
 
@@ -528,7 +836,7 @@ export default function ExternalStockSearch() {
           {projects.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {projects.map((p) => (
-                <ExternalProjectCard key={p.id} project={p} />
+                <ExternalProjectCard key={p.id} project={p} onClick={handleProjectClick} />
               ))}
             </div>
           )}
@@ -560,6 +868,21 @@ export default function ExternalStockSearch() {
             Sincroniza los datos y luego presiona Buscar para ver proyectos
           </p>
         </div>
+      )}
+
+      {/* Modal de unidades */}
+      {selectedProject && (
+        <UnitsModal
+          project={selectedProject}
+          units={units}
+          loading={loadingUnits}
+          error={unitsError}
+          onClose={() => {
+            setSelectedProject(null)
+            setUnits([])
+            setUnitsError(null)
+          }}
+        />
       )}
     </div>
   )
