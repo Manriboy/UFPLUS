@@ -17,7 +17,6 @@ import {
   Building2,
   Store,
   Megaphone,
-  Database,
 } from 'lucide-react'
 
 const nav = [
@@ -59,11 +58,6 @@ const nav = [
     label: 'Banner publicitario',
     href: '/admin/banner',
     icon: Megaphone,
-  },
-  {
-    label: 'Stock Unificado',
-    href: '/admin/stock-unificado',
-    icon: Database,
   },
 ]
 

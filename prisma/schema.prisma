@@ -306,37 +306,3 @@ model Setting {
   value     String   @db.Text
   updatedAt DateTime @updatedAt
 }
-
-// ─── STOCK EXTERNO UNIFICADO ──────────────────────────
-
-model ExternalProject {
-  id               String   @id @default(cuid())
-  source           String   // 'jetbrokers' | 'brouk' | 'iris'
-  sourceId         String   // ID en el sistema de origen
-
-  name             String
-  commune          String?
-  region           String?
-
-  deliveryPeriod   String?  // texto libre: "Primer Semestre", "Inmediata", etc.
-  deliveryYear     Int?
-  stage            String?  // 'green' | 'deliveryReady' | 'white' (JetBrokers)
-  developerName    String?
-  organizationName String?
-
-  priceFrom        Float?   // UF — precio mínimo del proyecto
-  imageUrl         String?
-
-  typologies       String[] // ['1D','2D','3D+S'] — tipologías disponibles
-
-  rawData          Json     @default("{}")
-
-  syncedAt         DateTime @default(now())
-  lastSeenAt       DateTime @updatedAt
-
-  @@unique([source, sourceId])
-  @@index([source])
-  @@index([commune])
-  @@index([priceFrom])
-  @@index([stage])
-}
