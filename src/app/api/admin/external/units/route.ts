@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+
+const JB_TOKEN = process.env.JETBROKERS_TOKEN ?? 'PtDBqd29'
 
 type JBUnit = {
   id: string
@@ -21,76 +24,90 @@ type JBUnit = {
   hasStorage: boolean
 }
 
+async function getJetBrokersUnits(sourceId: string): Promise<JBUnit[]> {
+  // Leer desde BD (la API de JetBrokers bloquea requests server-to-server)
+  const ep = await prisma.externalProject.findUnique({
+    where: { source_sourceId: { source: 'jetbrokers', sourceId } },
+    select: { id: true },
+  })
+  if (!ep) return []
+  const units = await prisma.externalUnit.findMany({
+    where: { projectId: ep.id, available: true },
+    orderBy: [{ model: 'asc' }, { finalPrice: 'asc' }],
+  })
+  return units.map(u => ({
+    id: u.sourceId,
+    number: u.number ?? '',
+    typology: u.model ?? '',
+    rooms: u.bedrooms ?? 0,
+    bathrooms: u.bathrooms ?? 0,
+    surfaceInterior: u.m2Interior ?? 0,
+    surfaceTerrace: u.m2Terrace ?? 0,
+    surfaceTotal: (u.m2Interior ?? 0) + (u.m2Terrace ?? 0),
+    facing: u.facing ?? null,
+    price: u.price ?? 0,
+    finalPrice: u.finalPrice ?? u.price ?? 0,
+    discountRate: u.discountPct ?? 0,
+    bonoPie: u.bonoPie ?? 0,
+    available: u.available,
+    hasParking: false,
+    hasStorage: false,
+  }))
+}
+
+async function getIrisUnits(projectId: string): Promise<JBUnit[]> {
+  const units = await prisma.externalUnit.findMany({
+    where: { projectId, source: 'iris', available: true },
+    orderBy: [{ model: 'asc' }, { finalPrice: 'asc' }],
+  })
+  return units.map(u => ({
+    id: u.sourceId,
+    number: u.number ?? '',
+    typology: u.model ?? '',
+    rooms: u.bedrooms ?? 0,
+    bathrooms: u.bathrooms ?? 0,
+    surfaceInterior: u.m2Interior ?? 0,
+    surfaceTerrace: u.m2Terrace ?? 0,
+    surfaceTotal: (u.m2Interior ?? 0) + (u.m2Terrace ?? 0),
+    facing: u.facing ?? null,
+    price: u.price ?? 0,
+    finalPrice: u.finalPrice ?? u.price ?? 0,
+    discountRate: u.discountPct ?? 0,
+    bonoPie: u.bonoPie ?? 0,
+    available: u.available,
+    hasParking: false,
+    hasStorage: false,
+  }))
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
+  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const body = await req.json()
-  const { sourceId, source } = body as { projectId: string; sourceId: string; source: string }
+  const { projectId, sourceId, source } = body as { projectId: string; sourceId: string; source: string }
 
   if (!sourceId || !source) {
     return NextResponse.json({ error: 'sourceId y source son requeridos' }, { status: 400 })
   }
 
-  if (source !== 'jetbrokers') {
-    return NextResponse.json({ error: `Fuente no soportada: ${source}` }, { status: 400 })
-  }
-
-  const url = `https://app.jetbrokers.io/api/marketplace/units-search/${Date.now()}`
-
-  const jbRes = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer PtDBqd29',
-      'Content-Type': 'application/json',
-      'device': 'w',
-      'jet-brokers-version': '7.42.0',
-    },
-    body: JSON.stringify({
-      tipologies: [],
-      type: null,
-      order: 'ASC',
-      models: [],
-      facings: [],
-      projectId: sourceId,
-      availability: 'available',
-      number: null,
-      element: 0,
-      elements: 9999,
-    }),
-  })
-
-  if (!jbRes.ok) {
-    return NextResponse.json({ error: 'Error al consultar JetBrokers' }, { status: 502 })
-  }
-
-  const jbData = await jbRes.json()
-  const apartments: unknown[] = Array.isArray(jbData.apartments) ? jbData.apartments : []
-
-  const units: JBUnit[] = apartments.map((apt: unknown) => {
-    const a = apt as Record<string, unknown>
-    const model = (a.apartmentModel ?? {}) as Record<string, unknown>
-    return {
-      id: String(a.id ?? ''),
-      number: String(a.number ?? ''),
-      typology: String(model.name ?? ''),
-      rooms: Number(model.rooms ?? 0),
-      bathrooms: Number(model.bathrooms ?? 0),
-      surfaceInterior: parseFloat(String(a.surfaceInterior ?? '0')),
-      surfaceTerrace: parseFloat(String(a.surfaceTerrace ?? '0')),
-      surfaceTotal: parseFloat(String(a.surfaceTotal ?? '0')),
-      facing: a.facing ? String(a.facing) : null,
-      price: parseFloat(String(a.price ?? '0')),
-      finalPrice: parseFloat(String(a.finalPrice ?? '0')),
-      discountRate: parseFloat(String(a.discountRate ?? '0')),
-      bonoPie: parseFloat(String(a.bonoPie ?? '0')),
-      available: Boolean(a.available),
-      hasParking: a.parking !== null && a.parking !== undefined,
-      hasStorage: a.store !== null && a.store !== undefined,
+  try {
+    let units: JBUnit[]
+    if (source === 'jetbrokers') {
+      units = await getJetBrokersUnits(sourceId)
+    } else if (source === 'iris') {
+      // projectId is the ExternalProject.id (canonical links to it)
+      const ep = await prisma.externalProject.findUnique({
+        where: { source_sourceId: { source: 'iris', sourceId } },
+        select: { id: true }
+      })
+      units = ep ? await getIrisUnits(ep.id) : []
+    } else {
+      return NextResponse.json({ error: `Fuente no soportada: ${source}` }, { status: 400 })
     }
-  })
-
-  return NextResponse.json({ units, total: units.length })
+    return NextResponse.json({ units, total: units.length })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Error desconocido'
+    return NextResponse.json({ error: msg }, { status: 502 })
+  }
 }

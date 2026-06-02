@@ -505,8 +505,29 @@ export async function POST(req: NextRequest) {
 
   // ── 5. Unificar: Iris primero, UFPlus al final ────────
 
+  // Enriquecer con coordenadas HERE almacenadas en BD (autoritativas, no desplazadas por jitter)
+  const irisIds = filteredIris.map((p) => String(p.id))
+  const dbCoords = irisIds.length > 0
+    ? await prisma.externalProject.findMany({
+        where: { source: 'iris', sourceId: { in: irisIds } },
+        select: { sourceId: true, hereLat: true, hereLng: true, lat: true, lng: true },
+      })
+    : []
+  const coordsMap = new Map(dbCoords.map((r) => [r.sourceId, {
+    lat: r.hereLat ?? r.lat,
+    lng: r.hereLng ?? r.lng,
+  }]))
+
   const combined: MappedProject[] = [
-    ...filteredIris.map(mapIrisProject),
+    ...filteredIris.map((p) => {
+      const mapped = mapIrisProject(p)
+      const stored = coordsMap.get(String(p.id))
+      if (stored?.lat != null) {
+        mapped.lat = stored.lat
+        mapped.lng = stored.lng
+      }
+      return mapped
+    }),
     ...dedupedUFPlus.map(mapUFPlusProject),
   ]
 

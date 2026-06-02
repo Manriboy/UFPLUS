@@ -309,6 +309,41 @@ model Setting {
 
 // ─── STOCK EXTERNO UNIFICADO ──────────────────────────
 
+model CanonicalProject {
+  id               String   @id @default(cuid())
+  name             String
+  commune          String?
+  address          String?
+  lat              Float?
+  lng              Float?
+  hereLat          Float?
+  hereLng          Float?
+  deliveryPeriod   String?
+  deliveryYear     Int?
+  stage            String?
+  developerName    String?
+  priceFrom        Float?
+  imageUrl         String?
+  typologies       String[]
+  description        String?  @db.Text
+  commercialDesc     String?  @db.Text
+  paymentMethodsHtml String?  @db.Text
+  condicionesUrl     String?
+  brochureUrl        String?
+  notesHtml          String?  @db.Text
+  pie                Float?
+  reservaCLP         Int?
+  cuotasPreEntrega   Int?
+  tags               String[]
+  sources          String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  externalProjects ExternalProject[]
+
+  @@index([commune])
+  @@index([priceFrom])
+}
+
 model ExternalProject {
   id               String   @id @default(cuid())
   source           String   // 'jetbrokers' | 'brouk' | 'iris'
@@ -329,14 +364,72 @@ model ExternalProject {
 
   typologies       String[] // ['1D','2D','3D+S'] — tipologías disponibles
 
+  // Ubicación
+  lat              Float?
+  lng              Float?
+  hereLat          Float?   // Coordenada HERE autorizada (nunca sobrescrita por sync)
+  hereLng          Float?
+  address          String?
+
+  // Condiciones comerciales
+  description        String?  @db.Text
+  commercialDesc     String?  @db.Text  // Iris: commercial_conditions_description / Brouk: Descuentos
+  paymentMethodsHtml String?  @db.Text  // Iris: financial.payment_methods (HTML)
+  condicionesUrl     String?            // Iris: extra_file (URL al PDF de condiciones)
+  brochureUrl        String?            // Iris: brochure (URL al brochure del proyecto)
+  notesHtml          String?  @db.Text  // JetBrokers: /api/marketplace/notes/{slug}
+  pie                Float?             // JetBrokers: % pie requerido
+  reservaCLP         Int?               // JetBrokers: monto reserva en CLP
+  cuotasPreEntrega   Int?               // JetBrokers
+  tags               String[]           // JetBrokers
+
+  // Brouk
+  driveUrl           String?
+  stockFileUrl       String?
+
   rawData          Json     @default("{}")
 
   syncedAt         DateTime @default(now())
   lastSeenAt       DateTime @updatedAt
+
+  canonicalId      String?
+  canonical        CanonicalProject? @relation(fields: [canonicalId], references: [id])
+
+  units            ExternalUnit[]
 
   @@unique([source, sourceId])
   @@index([source])
   @@index([commune])
   @@index([priceFrom])
   @@index([stage])
+}
+
+model ExternalUnit {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     ExternalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  source      String          // 'jetbrokers' | 'iris'
+  sourceId    String          // ID de la unidad en el origen
+
+  number      String?
+  model       String?
+  bedrooms    Int?
+  bathrooms   Int?
+  m2Interior  Float?
+  m2Terrace   Float?
+  floor       String?
+  facing      String?
+  price       Float?
+  finalPrice  Float?
+  discountPct Float?
+  bonoPie     Float?
+  planUrl     String?
+  available   Boolean  @default(true)
+
+  rawData     Json     @default("{}")
+  syncedAt    DateTime @default(now())
+
+  @@unique([source, sourceId])
+  @@index([projectId])
+  @@index([available])
 }

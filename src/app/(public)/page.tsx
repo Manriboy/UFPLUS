@@ -250,8 +250,8 @@ export default async function HomePage() {
         <div className="container-section">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-8 border-t border-white/10 pt-10">
             {[
-              { value: '+100', label: 'Proyectos analizados' },
-              { value: '+15', label: 'Inmobiliarias' },
+              { value: '+150', label: 'Proyectos analizados' },
+              { value: '+40', label: 'Inmobiliarias' },
               { value: '+30', label: 'Comunas en todo el país' },
               { value: '+150', label: 'Clientes satisfechos' },
             ].map((stat) => (

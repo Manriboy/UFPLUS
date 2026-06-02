@@ -1,7 +1,7 @@
 'use client'
 // src/components/admin/ProjectMap.tsx
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Map as LMap, Marker as LMarker } from 'leaflet'
 
 export interface MapProject {
@@ -9,7 +9,9 @@ export interface MapProject {
   title: string
   lat: number
   lng: number
-  source: 'iris' | 'ufplus'
+  hereLat?: number | null
+  hereLng?: number | null
+  source: string
 }
 
 interface ProjectMapProps {
@@ -33,9 +35,10 @@ function pinSvg(color: string, size: number) {
 }
 
 function jitter(id: string | number, index: number): [number, number] {
+  if (index === 0) return [0, 0]
   const hash = String(id).split('').reduce((acc, c) => acc + c.charCodeAt(0), index * 31)
   const angle = (hash % 360) * (Math.PI / 180)
-  const radius = 0.003 + (hash % 10) * 0.0004
+  const radius = 0.00008 + (hash % 5) * 0.00002  // máx ~18m
   return [Math.sin(angle) * radius, Math.cos(angle) * radius]
 }
 
@@ -57,6 +60,9 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
   const mapRef = useRef<LMap | null>(null)
   const markersRef = useRef<Map<string, LMarker>>(new Map())
   const onSelectRef = useRef(onSelect)
+  const wheelCleanupRef = useRef<(() => void) | null>(null)
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [hint, setHint] = useState(false)
   onSelectRef.current = onSelect
 
   // Inicializar mapa
@@ -79,18 +85,42 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
         zoom: 12,
         zoomControl: true,
         dragging: true,
-        scrollWheelZoom: true,
+        scrollWheelZoom: false,   // deshabilitado — usamos handler propio
         doubleClickZoom: true,
         touchZoom: true,
       })
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20,
-      }).addTo(map)
+      const hereKey = process.env.NEXT_PUBLIC_HERE_API_KEY
+      L.tileLayer(
+        hereKey
+          ? `https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png8?style=explore.day&apiKey=${hereKey}`
+          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+          attribution: hereKey
+            ? '© <a href="https://www.here.com">HERE Maps</a>'
+            : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: hereKey ? 20 : 19,
+        }
+      ).addTo(map)
 
       mapRef.current = map
+
+      // Zoom con Ctrl/Cmd + scroll. Los navegadores sintetizan ctrlKey=true
+      // en gestos de pinch en trackpad, por lo que el pinch sigue funcionando.
+      const el = containerRef.current!
+      const onWheel = (e: WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault()
+          map.setZoom(map.getZoom() + (e.deltaY < 0 ? 1 : -1))
+        } else {
+          // Mostrar hint brevemente
+          setHint(true)
+          if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+          hintTimerRef.current = setTimeout(() => setHint(false), 1500)
+        }
+      }
+      el.addEventListener('wheel', onWheel, { passive: false })
+      wheelCleanupRef.current = () => el.removeEventListener('wheel', onWheel)
 
       // Recalcular tamaño después de que el DOM esté listo
       setTimeout(() => {
@@ -103,6 +133,8 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
 
     return () => {
       cancelled = true
+      wheelCleanupRef.current?.()
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
@@ -148,11 +180,19 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
   }, [selectedId])
 
   return (
-    <div className="w-full h-[420px] rounded-xl border border-gray-200 overflow-hidden">
+    <div className="relative w-full h-[420px] rounded-xl border border-gray-200 overflow-hidden">
       <div
         ref={containerRef}
         style={{ width: '100%', height: '100%', touchAction: 'none' }}
       />
+      {/* Hint: usa Ctrl/Cmd + scroll */}
+      {hint && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="bg-black/60 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            Usa <kbd className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-xs">Ctrl</kbd> + scroll para hacer zoom
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -174,7 +214,9 @@ function updateMarkers(
   const coordKey = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`
 
   projects.forEach((p) => {
-    const key = coordKey(p.lat, p.lng)
+    const baseLat = (p.hereLat != null) ? p.hereLat : p.lat
+    const baseLng = (p.hereLng != null) ? p.hereLng : p.lng
+    const key = coordKey(baseLat, baseLng)
     const idx = coordGroups[key] ?? 0
     coordGroups[key] = idx + 1
 
@@ -191,7 +233,7 @@ function updateMarkers(
       popupAnchor: [0, -size * 1.5],
     })
 
-    const pos: [number, number] = [p.lat + dlat, p.lng + dlng]
+    const pos: [number, number] = [baseLat + dlat, baseLng + dlng]
     const existingMarker = existing.get(String(p.id))
 
     if (existingMarker) {
@@ -210,7 +252,7 @@ function updateMarkers(
   })
 
   if (projects.length > 0) {
-    const bounds = L.latLngBounds(projects.map((p) => [p.lat, p.lng]))
+    const bounds = L.latLngBounds(projects.map((p) => [p.hereLat ?? p.lat, p.hereLng ?? p.lng]))
     map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
   }
 }
