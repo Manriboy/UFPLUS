@@ -12,6 +12,7 @@ type SearchFilter = {
   bonoPieMin?: number
   priceMin?: number
   priceMax?: number
+  sources?: string[]   // ['iris','jetbrokers','brouk'] — vacío = todas
 }
 
 export async function POST(req: NextRequest) {
@@ -21,9 +22,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const filter: SearchFilter = body.filter ?? {}
 
-  // Base: solo proyectos con al menos una unidad disponible
+  // Fuentes activas (todas por defecto)
+  const activeSources = filter.sources && filter.sources.length > 0
+    ? filter.sources
+    : ['iris', 'jetbrokers', 'brouk']
+
+  // Base: proyectos con unidades de alguna fuente activa
   const where: Prisma.CanonicalProjectWhereInput = {
-    externalProjects: { some: { units: { some: { available: true } } } },
+    externalProjects: {
+      some: {
+        source: { in: activeSources },
+        units: { some: { available: true } },
+      },
+    },
   }
 
   if (filter.q?.trim()) {
@@ -73,7 +84,11 @@ export async function POST(req: NextRequest) {
       },
     }),
     prisma.canonicalProject.findMany({
-      where: { externalProjects: { some: { units: { some: { available: true } } } } },
+      where: {
+        externalProjects: {
+          some: { source: { in: activeSources }, units: { some: { available: true } } },
+        },
+      },
       select: { commune: true, stage: true },
     }),
   ])

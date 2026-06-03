@@ -80,16 +80,13 @@ export async function GET() {
         send(70, `${activeSourceIds.length} unidades activas identificadas`)
 
         // 4. Actualizar disponibilidad en 2 queries (sin importar cuántas unidades haya)
-        await prisma.externalUnit.updateMany({
-          where: { source: 'iris' },
-          data: { available: false },
-        })
+        await prisma.$executeRaw`UPDATE "ExternalUnit" SET available = false WHERE source = 'iris'`
 
         if (activeSourceIds.length > 0) {
-          await prisma.externalUnit.updateMany({
-            where: { source: 'iris', sourceId: { in: activeSourceIds } },
-            data: { available: true },
-          })
+          await prisma.$executeRaw`
+            UPDATE "ExternalUnit" SET available = true
+            WHERE source = 'iris' AND "sourceId" = ANY(${activeSourceIds}::text[])
+          `
         }
 
         send(100, `Listo: ${activeSourceIds.length} unidades disponibles de ${allProjects.length} proyectos`, { done: true })

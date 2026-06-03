@@ -20,7 +20,7 @@ type IrisProject = {
   id: number; title: string; address: string
   latitude: number | string | null; longitude: number | string | null
   handover_date_text: string; commercial_conditions_description: string | null
-  extra_file: string | null; images: string[]
+  extra_file: string | null; brochure?: string | null; images: string[]
   zone: { id: number; name: string } | null
   department: { id: number; name: string } | null
   status: { name: string } | null
@@ -146,9 +146,10 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
     }))
     if (!project) continue
 
-    await withRetry(() => prisma.externalUnit.updateMany({
-      where: { projectId: project.id, source: 'iris' }, data: { available: false },
-    }))
+    await withRetry(() => prisma.$executeRaw`
+      UPDATE "ExternalUnit" SET available = false
+      WHERE "projectId" = ${project.id} AND source = 'iris'
+    `)
 
     for (const u of p.units ?? []) {
       await withRetry(() => prisma.externalUnit.upsert({

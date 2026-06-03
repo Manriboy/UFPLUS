@@ -51,6 +51,7 @@ type SearchFilter = {
   bonoPieMin?: number
   priceMin?: number
   priceMax?: number
+  sources?: string[]
 }
 
 type JBUnit = {
@@ -291,10 +292,11 @@ function TipologiaSelect({ selected, onChange }: {
 
 // ─── ProjectCard ──────────────────────────────────────
 
-function ExternalProjectCard({ project, onShowUnits, onShowCondiciones }: {
+function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCondicionesPdf }: {
   project: CanonicalProject
   onShowUnits: (p: CanonicalProject) => void
   onShowCondiciones: (p: CanonicalProject) => void
+  onShowCondicionesPdf: (url: string, name: string) => void
 }) {
   const stageLabel = project.stage ? (STAGE_LABELS[project.stage] ?? project.stage) : null
   const stageColor = project.stage ? (STAGE_COLORS[project.stage] ?? 'bg-gray-100 text-gray-700') : null
@@ -415,9 +417,9 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones }: {
               </div>
             )}
 
-            {/* Brochure + Condiciones en la misma fila */}
-            {(irisEp?.brochureUrl || hasCondiciones) && (
-              <div className="flex items-center gap-4">
+            {/* Brochure + Condiciones HTML + Condiciones PDF en la misma fila */}
+            {(irisEp?.brochureUrl || hasCondiciones || irisEp?.condicionesUrl) && (
+              <div className="flex items-center gap-4 flex-wrap">
                 {irisEp?.brochureUrl && (
                   <a
                     href={irisEp.brochureUrl} target="_blank" rel="noreferrer"
@@ -433,6 +435,14 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones }: {
                     onClick={e => { e.stopPropagation(); onShowCondiciones(project) }}
                   >
                     <ScrollText className="h-3.5 w-3.5" /> Condiciones
+                  </button>
+                )}
+                {irisEp?.condicionesUrl && (
+                  <button
+                    className="flex items-center gap-1.5 text-xs font-medium text-brand-primary hover:underline text-left"
+                    onClick={e => { e.stopPropagation(); onShowCondicionesPdf(irisEp.condicionesUrl!, project.name) }}
+                  >
+                    <FileText className="h-3.5 w-3.5" /> Condiciones PDF
                   </button>
                 )}
               </div>
@@ -512,14 +522,26 @@ function UnitsModal({ project, units, loading, error, onClose }: {
     else { setSortField(field); setSortDir('asc') }
   }
 
+  const effectiveDiscount = (u: JBUnit) =>
+    u.discountRate > 0 ? u.discountRate : (project.maxBonoPie ?? 0)
+  const effectiveFinalPrice = (u: JBUnit) => {
+    const d = effectiveDiscount(u)
+    return d > 0 ? u.price * (1 - d / 100) : u.finalPrice
+  }
+
   const baseFiltered = activeTypology === 'all' ? units : units.filter(u => u.typology === activeTypology)
   const filtered = [...baseFiltered].sort((a, b) => {
-    const av = a[sortField] ?? ''
-    const bv = b[sortField] ?? ''
+    const getVal = (u: JBUnit) => {
+      if (sortField === 'finalPrice') return effectiveFinalPrice(u)
+      if (sortField === 'discountRate') return effectiveDiscount(u)
+      return u[sortField] ?? ''
+    }
+    const av = getVal(a)
+    const bv = getVal(b)
     const cmp = av < bv ? -1 : av > bv ? 1 : 0
     return sortDir === 'asc' ? cmp : -cmp
   })
-  const priceFrom = units.length > 0 ? Math.min(...units.map(u => u.finalPrice)) : null
+  const priceFrom = units.length > 0 ? Math.min(...units.map(u => effectiveFinalPrice(u))) : null
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -695,20 +717,22 @@ function UnitsModal({ project, units, loading, error, onClose }: {
                       {unit.facing ? (FACING_LABELS[unit.facing] ?? unit.facing) : '—'}
                     </td>
                     <td className="px-3 py-2.5">
-                      {unit.discountRate > 0
+                      {effectiveDiscount(unit) > 0
                         ? <span className="text-xs text-gray-400 line-through">{formatUF(unit.price)}</span>
                         : <span className="text-gray-700">{formatUF(unit.price)}</span>
                       }
                     </td>
                     <td className="px-3 py-2.5">
-                      {unit.discountRate > 0
-                        ? <span className="text-xs font-semibold text-emerald-600">{unit.discountRate.toFixed(1)}%</span>
+                      {effectiveDiscount(unit) > 0
+                        ? <span className={cn('text-xs font-semibold text-emerald-600', unit.discountRate === 0 && 'opacity-70')}>
+                            {effectiveDiscount(unit).toFixed(1)}%
+                          </span>
                         : <span className="text-gray-400">—</span>
                       }
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={cn('font-semibold', unit.discountRate > 0 ? 'text-emerald-600' : 'text-gray-900')}>
-                        {formatUF(unit.finalPrice)}
+                      <span className={cn('font-semibold', effectiveDiscount(unit) > 0 ? 'text-emerald-600' : 'text-gray-900')}>
+                        {formatUF(effectiveFinalPrice(unit))}
                       </span>
                     </td>
                   </tr>
@@ -820,6 +844,58 @@ function CondicionesModal({ project, onClose }: {
   )
 }
 
+// ─── PdfModal ─────────────────────────────────────────
+
+function PdfModal({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
+          <div className="min-w-0">
+            <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold">Condiciones comerciales</p>
+            <h2 className="text-sm font-bold text-gray-900 truncate">{title}</h2>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-xs font-medium text-brand-primary hover:underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Abrir en nueva pestaña
+            </a>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <iframe
+          src={url}
+          className="flex-1 w-full border-0"
+          title={`Condiciones comerciales — ${title}`}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Componente principal ─────────────────────────────
 
 export default function ExternalStockSearch() {
@@ -835,6 +911,9 @@ export default function ExternalStockSearch() {
   const [tipologias, setTipologias] = useState<string[]>([])
   const [bonoPieMin, setBonoPieMin] = useState('')
   const [priceRange, setPriceRange] = useState<[number, number]>([0, PRICE_MAX])
+  const [srcAws, setSrcAws] = useState(true)
+  const [srcDrive, setSrcDrive] = useState(true)
+  const [srcGcp, setSrcGcp] = useState(true)
 
   const handlePriceInput = (side: 'min' | 'max', raw: string) => {
     const v = Math.max(0, Math.min(PRICE_MAX, parseInt(raw) || 0))
@@ -851,6 +930,7 @@ export default function ExternalStockSearch() {
   const [unitsError, setUnitsError] = useState<string | null>(null)
 
   const [condicionesProject, setCondicionesProject] = useState<CanonicalProject | null>(null)
+  const [pdfModal, setPdfModal] = useState<{ url: string; name: string } | null>(null)
 
   const selectedRegion = useMemo(() => IRIS_REGIONS.find(r => r.id === regionId), [regionId])
   const canSearch = regionId !== '' || q.trim().length > 0
@@ -892,8 +972,16 @@ export default function ExternalStockSearch() {
     if (bonoPieMin) filter.bonoPieMin = parseFloat(bonoPieMin)
     if (priceRange[0] > 0) filter.priceMin = priceRange[0]
     if (priceRange[1] < PRICE_MAX) filter.priceMax = priceRange[1]
+
+    const sources = [
+      ...(srcAws   ? ['iris']        : []),
+      ...(srcDrive ? ['brouk']       : []),
+      ...(srcGcp   ? ['jetbrokers']  : []),
+    ]
+    if (sources.length < 3) filter.sources = sources
+
     return filter
-  }, [q, selectedRegion, zoneIds, tipologias, bonoPieMin, priceRange])
+  }, [q, selectedRegion, zoneIds, tipologias, bonoPieMin, priceRange, srcAws, srcDrive, srcGcp])
 
   const search = useCallback(async () => {
     if (!canSearch) return
@@ -954,6 +1042,9 @@ export default function ExternalStockSearch() {
     setTipologias([])
     setBonoPieMin('')
     setPriceRange([0, PRICE_MAX])
+    setSrcAws(true)
+    setSrcDrive(true)
+    setSrcGcp(true)
   }
 
   const priceActive = priceRange[0] > 0 || priceRange[1] < PRICE_MAX
@@ -968,6 +1059,34 @@ export default function ExternalStockSearch() {
         <p className="text-sm text-gray-500 mt-0.5">
           Busca proyectos en el stock sincronizado de todas las fuentes
         </p>
+      </div>
+
+      {/* Switches de fuente */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fuentes:</span>
+        {([
+          { key: 'aws',   label: 'AWS',   value: srcAws,   set: setSrcAws,   color: 'bg-orange-500' },
+          { key: 'drive', label: 'Drive',  value: srcDrive, set: setSrcDrive, color: 'bg-blue-600' },
+          { key: 'gcp',   label: 'GCP',   value: srcGcp,   set: setSrcGcp,   color: 'bg-sky-400' },
+        ] as const).map(src => (
+          <button
+            key={src.key}
+            type="button"
+            onClick={() => src.set(v => !v)}
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border',
+              src.value
+                ? `${src.color} text-white border-transparent`
+                : 'bg-white text-gray-400 border-gray-200'
+            )}
+          >
+            <span className={cn(
+              'inline-block w-3.5 h-3.5 rounded-full border-2 transition-colors',
+              src.value ? 'bg-white border-white/60' : 'bg-gray-200 border-gray-300'
+            )} />
+            {src.label}
+          </button>
+        ))}
       </div>
 
       {/* Panel de filtros */}
@@ -1176,6 +1295,7 @@ export default function ExternalStockSearch() {
                   project={p}
                   onShowUnits={handleProjectClick}
                   onShowCondiciones={setCondicionesProject}
+                  onShowCondicionesPdf={(url, name) => setPdfModal({ url, name })}
                 />
               ))}
             </div>
@@ -1218,11 +1338,20 @@ export default function ExternalStockSearch() {
         />
       )}
 
-      {/* Modal de condiciones comerciales */}
+      {/* Modal de condiciones comerciales (HTML) */}
       {condicionesProject && (
         <CondicionesModal
           project={condicionesProject}
           onClose={() => setCondicionesProject(null)}
+        />
+      )}
+
+      {/* Modal PDF de condiciones comerciales AWS */}
+      {pdfModal && (
+        <PdfModal
+          url={pdfModal.url}
+          title={pdfModal.name}
+          onClose={() => setPdfModal(null)}
         />
       )}
     </div>

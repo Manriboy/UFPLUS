@@ -1,35 +1,51 @@
 /**
  * upload-jb-photos-to-drive.ts
- * Descarga las fotos de los proyectos GCP (JetBrokers) y las sube a Google Drive.
+ * Descarga las fotos de los proyectos GCP seleccionados y las guarda en disco.
  *
- * Estructura que crea en Drive:
- *   {DRIVE_PARENT_FOLDER_ID}/
- *     GCP/
- *       {nombre proyecto}/
- *         {fileId}.jpg
- *
- * Requisitos:
- *   - JETBROKERS_EMAIL + JETBROKERS_PASSWORD en .env.local
- *   - GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY (o GOOGLE_CREDENTIALS_BASE64)
- *   - DRIVE_PARENT_FOLDER_ID en .env.local (ID de la carpeta raíz en Drive, opcional — si no se indica se crea en My Drive)
- *   - Service Account con scope "drive" (no solo drive.readonly)
+ * Estructura de salida:
+ *   {OUTPUT_DIR}/GCP/{nombre proyecto}/{fileId}.jpg
  *
  * Uso:
- *   npx tsx src/scripts/upload-jb-photos-to-drive.ts
- *   npx tsx src/scripts/upload-jb-photos-to-drive.ts --dry-run   (solo lista archivos, no sube)
+ *   npx tsx src/scripts/upload-jb-photos-to-drive.ts              (descarga real)
+ *   npx tsx src/scripts/upload-jb-photos-to-drive.ts --dry-run    (solo lista, no descarga)
+ *
+ * Luego arrastra la carpeta GCP a Google Drive Desktop para que sincronice.
  */
 
 import { config } from 'dotenv'
 config({ path: '.env.local' })
 
 import prisma from '../lib/prisma'
-import { google } from 'googleapis'
-import { Readable } from 'stream'
 import { execSync } from 'child_process'
+import * as fs from 'fs'
+import * as path from 'path'
+import * as os from 'os'
 
 const JB_BASE = 'https://app.jetbrokers.io'
 const PAGE_SIZE = 30
 const DRY_RUN = process.argv.includes('--dry-run')
+
+// Carpeta de salida — por defecto Desktop/GCP-Fotos
+const OUTPUT_DIR = process.env.GCP_OUTPUT_DIR ?? path.join(os.homedir(), 'Desktop', 'GCP-Fotos')
+
+// ── Proyectos seleccionados ───────────────────────────
+
+const SELECTED_SLUGS = [
+  'Ejoqol9P', // Almagro Hub
+  'Nek4k8rJ', // Carrera IV
+  '7APBqUib', // FRANKLIN 358
+  'kk3PL5AS', // Independencia 847 Oficinas
+  'tPdd0WGN', // Locales Nuevos
+  'zMniImEN', // Rengo
+  'H3uXKBii', // San Eugenio Etapa II
+  'ZUTcafDi', // Santos Dumont 1070 B
+  'mdvg21vl', // Santos Dumont 1070 C
+  'KH3MGIg5', // Santos Dumont A2
+  '94lqa3BT', // Serafin Zamora 22
+  'FdxmDT5H', // USADOS ESTACION CENTRAL
+  'dqRkmChY', // USADOS MACUL
+  'GQ35sIsX', // Vicuña Mackenna 7244
+]
 
 // ── Tipos ─────────────────────────────────────────────
 
@@ -41,75 +57,8 @@ type JBFile = {
   details: string | null
 }
 
-// ── Google Drive auth ─────────────────────────────────
+// ── JetBrokers helpers via curl ───────────────────────
 
-function getDriveAuth() {
-  const b64 = process.env.GOOGLE_CREDENTIALS_BASE64
-  if (b64) {
-    const credentials = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))
-    return new google.auth.GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/drive'] })
-  }
-  const raw = process.env.GOOGLE_PRIVATE_KEY
-  if (!raw || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
-    throw new Error('Faltan credenciales de Google. Define GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY en .env.local')
-  }
-  const privateKey = raw.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/^["']|["']$/g, '')
-  return new google.auth.GoogleAuth({
-    credentials: { client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, private_key: privateKey },
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  })
-}
-
-// ── Drive helpers ─────────────────────────────────────
-
-async function findOrCreateFolder(drive: ReturnType<typeof google.drive>, name: string, parentId?: string): Promise<string> {
-  const q = [
-    `name = '${name.replace(/'/g, "\\'")}'`,
-    `mimeType = 'application/vnd.google-apps.folder'`,
-    `trashed = false`,
-    parentId ? `'${parentId}' in parents` : `'root' in parents`,
-  ].join(' and ')
-
-  const list = await drive.files.list({ q, fields: 'files(id,name)', pageSize: 1 })
-  if (list.data.files && list.data.files.length > 0) {
-    return list.data.files[0].id!
-  }
-
-  const created = await drive.files.create({
-    requestBody: {
-      name,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: parentId ? [parentId] : undefined,
-    },
-    fields: 'id',
-  })
-  return created.data.id!
-}
-
-async function fileExistsInFolder(drive: ReturnType<typeof google.drive>, filename: string, folderId: string): Promise<boolean> {
-  const q = `name = '${filename}' and '${folderId}' in parents and trashed = false`
-  const list = await drive.files.list({ q, fields: 'files(id)', pageSize: 1 })
-  return !!(list.data.files && list.data.files.length > 0)
-}
-
-async function uploadToDrive(
-  drive: ReturnType<typeof google.drive>,
-  buffer: Buffer,
-  filename: string,
-  mimeType: string,
-  folderId: string
-): Promise<void> {
-  const stream = Readable.from(buffer)
-  await drive.files.create({
-    requestBody: { name: filename, parents: [folderId] },
-    media: { mimeType, body: stream },
-    fields: 'id',
-  })
-}
-
-// ── JetBrokers helpers ────────────────────────────────
-
-// File listing: usa curl (funciona server-side, probado con éxito)
 function fetchFilePage(slug: string, pageNum: number, token: string): { files: JBFile[]; status: number } {
   try {
     const out = execSync(
@@ -133,7 +82,6 @@ function fetchFilePage(slug: string, pageNum: number, token: string): { files: J
   }
 }
 
-// File download: usa curl también
 function downloadFile(fileId: string, token: string): Buffer | null {
   try {
     const buf = execSync(
@@ -154,123 +102,101 @@ function downloadFile(fileId: string, token: string): Buffer | null {
 // ── Main ──────────────────────────────────────────────
 
 async function main() {
-  if (DRY_RUN) console.log('🔍  Modo DRY-RUN — no se sube nada a Drive\n')
+  if (DRY_RUN) console.log('🔍  Modo DRY-RUN — no se descarga nada\n')
 
-  // 1. Token desde BD (no usamos login Puppeteer — JetBrokers bloquea headless)
+  // Token desde BD
   const setting = await prisma.setting.findUnique({ where: { key: 'jetbrokers_token' } })
   const token = setting?.value ?? process.env.JETBROKERS_TOKEN ?? ''
-  if (!token) throw new Error('No hay token de JetBrokers. Corre primero el daily sync de GCP.')
-  console.log(`🔑  Token GCP: ${token.slice(0, 4)}****\n`)
+  if (!token) throw new Error('No hay token de JetBrokers. Actualiza jetbrokers_token en la BD.')
+  console.log(`🔑  Token GCP: ${token.slice(0, 4)}****`)
+  console.log(`📁  Salida: ${OUTPUT_DIR}\n`)
 
-  // 2. Proyectos GCP con acceso (los que tienen unidades)
-  const projects = await prisma.externalProject.findMany({
-    where: { source: 'jetbrokers', units: { some: { available: true } } },
-    select: { sourceId: true, name: true },
-    orderBy: { name: 'asc' },
-  })
-  console.log(`📦  ${projects.length} proyectos GCP con acceso\n`)
-
-  // 3. Google Drive
-  let drive: ReturnType<typeof google.drive> | null = null
-  let gcpFolderId = ''
-
-  if (!DRY_RUN) {
-    const auth = getDriveAuth()
-    drive = google.drive({ version: 'v3', auth })
-    const parentId = process.env.DRIVE_PARENT_FOLDER_ID ?? undefined
-    console.log('📁  Creando/localizando carpeta GCP en Drive...')
-    gcpFolderId = await findOrCreateFolder(drive, 'GCP', parentId)
-    console.log(`    Carpeta GCP: ${gcpFolderId}\n`)
-  }
-
-  // 4. Verificar token con curl
-  console.log('🌐  Verificando acceso a JetBrokers...')
+  // Verificar token
   const testResult = fetchFilePage('0TlaND3M', 0, token)
-  console.log(`    HTTP ${testResult.status} · ${testResult.files.length} archivos en proyecto de prueba\n`)
   if (testResult.status !== 200) {
     throw new Error(`Token inválido (HTTP ${testResult.status}). Actualiza jetbrokers_token en la BD.`)
   }
+  console.log(`✓  Token válido\n`)
 
-  try {
-    // 5. Procesar cada proyecto
-    let totalUploaded = 0, totalSkipped = 0, totalErrors = 0
+  // Proyectos desde BD
+  const projects = await prisma.externalProject.findMany({
+    where: { source: 'jetbrokers', sourceId: { in: SELECTED_SLUGS } },
+    select: { sourceId: true, name: true },
+    orderBy: { name: 'asc' },
+  })
+  console.log(`📦  ${projects.length} proyectos seleccionados\n`)
 
-    for (const project of projects) {
-      console.log(`\n📂  ${project.name} (${project.sourceId})`)
+  if (!DRY_RUN) {
+    fs.mkdirSync(path.join(OUTPUT_DIR, 'GCP'), { recursive: true })
+  }
 
-      // Crear carpeta del proyecto en Drive
-      let projectFolderId = ''
-      if (!DRY_RUN && drive) {
-        projectFolderId = await findOrCreateFolder(drive, project.name, gcpFolderId)
+  let totalDownloaded = 0, totalSkipped = 0, totalErrors = 0
+
+  for (const project of projects) {
+    // Sanitizar nombre de carpeta (quitar caracteres inválidos en filesystem)
+    const folderName = project.name.replace(/[/\\:*?"<>|]/g, '-').trim()
+    const projectDir = path.join(OUTPUT_DIR, 'GCP', folderName)
+
+    console.log(`\n📂  ${project.name}`)
+
+    if (!DRY_RUN) {
+      fs.mkdirSync(projectDir, { recursive: true })
+    }
+
+    // Obtener todos los archivos
+    process.stdout.write('    Obteniendo lista...')
+    const allFiles: JBFile[] = []
+    let pageNum = 0
+    while (true) {
+      const { files, status } = fetchFilePage(project.sourceId, pageNum, token)
+      if (files.length === 0) {
+        if (pageNum === 0 && status !== 200) process.stdout.write(` [HTTP ${status}]`)
+        break
       }
+      allFiles.push(...files)
+      process.stdout.write(` ${allFiles.length}`)
+      if (files.length < PAGE_SIZE) break
+      pageNum++
+    }
+    console.log()
 
-      // Obtener todas las páginas de archivos (desde browser Puppeteer)
-      process.stdout.write('    Obteniendo lista de archivos...')
-      const allFiles: JBFile[] = []
-      let pageNum = 0
-      while (true) {
-        const { files, status } = fetchFilePage(project.sourceId, pageNum, token)
-        if (files.length === 0) {
-          if (pageNum === 0 && status !== 200) process.stdout.write(` [HTTP ${status}]`)
-          break
-        }
-        allFiles.push(...files)
-        process.stdout.write(` ${allFiles.length}`)
-        if (files.length < PAGE_SIZE) break
-        pageNum++
-      }
-      console.log()
+    const images = allFiles.filter(f => f.mime.startsWith('image/'))
+    console.log(`    ${images.length} imágenes`)
 
-      const images = allFiles.filter(f => f.mime.startsWith('image/'))
-      console.log(`    ${images.length} imágenes (de ${allFiles.length} archivos totales)`)
+    if (DRY_RUN) continue
 
-      if (DRY_RUN) {
-        const byType: Record<string, number> = {}
-        for (const f of allFiles) byType[f.type] = (byType[f.type] ?? 0) + 1
-        console.log('    Tipos:', JSON.stringify(byType))
+    for (const file of images) {
+      const ext = file.mime.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg'
+      const filename = `${file.id}.${ext}`
+      const filePath = path.join(projectDir, filename)
+
+      // Saltar si ya existe
+      if (fs.existsSync(filePath)) {
+        totalSkipped++
         continue
       }
 
-      // Descargar (browser) y subir (Drive) cada imagen
-      for (const file of images) {
-        const ext = file.mime.split('/')[1] ?? 'jpg'
-        const filename = `${file.id}.${ext}`
-
-        if (await fileExistsInFolder(drive!, filename, projectFolderId)) {
-          totalSkipped++
-          continue
-        }
-
-        const buffer = downloadFile(file.id, token)
-        if (!buffer || buffer.length === 0) {
-          console.log(`    ✗ Error descargando ${file.id}`)
-          totalErrors++
-          continue
-        }
-
-        try {
-          await uploadToDrive(drive!, buffer, filename, file.mime, projectFolderId)
-          totalUploaded++
-          process.stdout.write('.')
-        } catch (e) {
-          console.log(`\n    ✗ Error subiendo ${filename}: ${(e as Error).message}`)
-          totalErrors++
-        }
-
-        await new Promise(r => setTimeout(r, 200))
+      const buffer = downloadFile(file.id, token)
+      if (!buffer || buffer.length === 0) {
+        totalErrors++
+        continue
       }
-      if (!DRY_RUN) console.log()
+
+      fs.writeFileSync(filePath, buffer)
+      totalDownloaded++
+      process.stdout.write('.')
     }
+    console.log()
+  }
 
-    console.log('\n✅  Completado:')
-    console.log(`   ${totalUploaded} imágenes subidas`)
-    console.log(`   ${totalSkipped} ya existían (saltadas)`)
-    console.log(`   ${totalErrors} errores`)
-    if (!DRY_RUN) console.log(`\n   Carpeta Drive: https://drive.google.com/drive/folders/${gcpFolderId}`)
-
-  } finally {
-    await prisma.$disconnect()
+  console.log('\n✅  Completado:')
+  console.log(`   ${totalDownloaded} imágenes descargadas`)
+  console.log(`   ${totalSkipped} ya existían (saltadas)`)
+  console.log(`   ${totalErrors} errores`)
+  if (!DRY_RUN) {
+    console.log(`\n📁  Carpeta: ${path.join(OUTPUT_DIR, 'GCP')}`)
+    console.log('   Arrastra esa carpeta a Google Drive Desktop para sincronizar.')
   }
 }
 
-main().catch(e => { console.error('\n❌ Error:', e.message); process.exit(1) })
+main().finally(() => prisma.$disconnect())

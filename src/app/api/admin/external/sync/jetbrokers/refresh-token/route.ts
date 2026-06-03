@@ -60,13 +60,13 @@ export async function POST() {
       await page.$('input[placeholder*="correo"]')
 
     if (!emailInput) throw new Error('No se encontró el campo de email')
-    await emailInput.click({ clickCount: 3 })
+    await emailInput.click({ count: 3 })
     await emailInput.type(email, { delay: 50 })
 
     // Llenar password
     const passwordInput = await page.$('input[type="password"]')
     if (!passwordInput) throw new Error('No se encontró el campo de contraseña')
-    await passwordInput.click({ clickCount: 3 })
+    await passwordInput.click({ count: 3 })
     await passwordInput.type(password, { delay: 50 })
 
     // Enviar formulario
