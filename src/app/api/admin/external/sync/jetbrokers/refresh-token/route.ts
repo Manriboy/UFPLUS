@@ -6,9 +6,24 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
-const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const JB_URL = 'https://app.jetbrokers.io'
 const TIMEOUT = 30000
+
+async function getLaunchConfig() {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    const chromium = await import('@sparticuz/chromium')
+    return {
+      executablePath: await chromium.default.executablePath(),
+      args: chromium.default.args,
+      headless: true as const,
+    }
+  }
+  return {
+    executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    headless: true as const,
+  }
+}
 
 export async function POST() {
   const session = await getServerSession(authOptions)
@@ -26,11 +41,7 @@ export async function POST() {
   let browser
   try {
     const puppeteer = await import('puppeteer-core')
-    browser = await puppeteer.default.launch({
-      executablePath: CHROME_PATH,
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    })
+    browser = await puppeteer.default.launch(await getLaunchConfig())
 
     const page = await browser.newPage()
 

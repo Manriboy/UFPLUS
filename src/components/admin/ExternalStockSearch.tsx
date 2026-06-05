@@ -648,7 +648,7 @@ function UnitsModal({ project, units, loading, error, onClose }: {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['N°', 'Modelo', 'Dorms', 'm² Int', 'm² Terraza', 'Orientación', 'Precio UF', 'Dto %', 'Precio Final UF'].map(col => (
+                  {['N°', 'Modelo', 'Dorm/B', 'm² Int', 'm² Terraza', 'Orientación', 'Precio UF', 'Dto %', 'Precio Final UF'].map(col => (
                     <th key={col} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{col}</th>
                   ))}
                 </tr>
@@ -679,7 +679,7 @@ function UnitsModal({ project, units, loading, error, onClose }: {
                   {([
                     ['N°', 'number'],
                     ['Modelo', 'typology'],
-                    ['Dorms', 'rooms'],
+                    ['Dorm/B', 'rooms'],
                     ['m² Int', 'surfaceInterior'],
                     ['m² Terraza', 'surfaceTerrace'],
                     ['Orientación', 'facing'],
@@ -710,7 +710,7 @@ function UnitsModal({ project, units, loading, error, onClose }: {
                     <td className="px-3 py-2.5">
                       <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{unit.typology}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-gray-700">{unit.rooms}</td>
+                    <td className="px-3 py-2.5 text-gray-700">{unit.rooms}/{unit.bathrooms ?? '?'}</td>
                     <td className="px-3 py-2.5 text-gray-700">{unit.surfaceInterior.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-gray-700">{unit.surfaceTerrace.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-gray-500 text-xs">
