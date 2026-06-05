@@ -10,11 +10,34 @@ interface User {
   id: string
   name: string | null
   email: string
-  role: 'ADMIN' | 'SUPERADMIN' | 'EDITOR'
+  role: 'ADMIN' | 'SUPERADMIN' | 'EDITOR' | 'PROPIETARIO' | 'BROKER'
   createdAt: string
 }
 
-const emptyForm = { name: '', email: '', password: '', role: 'ADMIN' as 'ADMIN' | 'SUPERADMIN' }
+type AnyRole    = 'ADMIN' | 'SUPERADMIN' | 'EDITOR' | 'PROPIETARIO' | 'BROKER'
+type BrokerType = 'PARTICULAR' | 'EMPRESA'
+const emptyForm = {
+  name: '', email: '', password: '',
+  role: 'ADMIN' as AnyRole,
+  brokerType: 'PARTICULAR' as BrokerType,
+  companyName: '',
+}
+
+const ROLE_LABELS: Record<AnyRole, string> = {
+  SUPERADMIN:  'Superadmin',
+  ADMIN:       'Admin',
+  EDITOR:      'Editor',
+  BROKER:      'Broker',
+  PROPIETARIO: 'Propietario',
+}
+
+const ROLE_COLORS: Record<AnyRole, string> = {
+  SUPERADMIN:  'bg-brand-primary/10 text-brand-primary',
+  ADMIN:       'bg-gray-100 text-gray-600',
+  EDITOR:      'bg-gray-100 text-gray-600',
+  BROKER:      'bg-sky-100 text-sky-700',
+  PROPIETARIO: 'bg-emerald-100 text-emerald-700',
+}
 
 export default function UsuariosPage() {
   const { data: session, status } = useSession()
@@ -60,7 +83,11 @@ export default function UsuariosPage() {
 
   function openEdit(u: User) {
     setSelected(u)
-    setForm({ name: u.name ?? '', email: u.email, password: '', role: u.role === 'EDITOR' ? 'ADMIN' : u.role })
+    setForm({
+      name: u.name ?? '', email: u.email, password: '', role: u.role,
+      brokerType: ((u as unknown as Record<string, unknown>).brokerType as BrokerType) ?? 'PARTICULAR',
+      companyName: ((u as unknown as Record<string, unknown>).companyName as string) ?? '',
+    })
     setError('')
     setModal('edit')
   }
@@ -171,8 +198,8 @@ export default function UsuariosPage() {
                   <td className="px-4 py-3 text-gray-800">{u.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full ${u.role === 'SUPERADMIN' ? 'bg-brand-primary/10 text-brand-primary' : 'bg-gray-100 text-gray-600'}`}>
-                      {u.role === 'SUPERADMIN' ? 'Superadmin' : 'Admin'}
+                    <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full ${ROLE_COLORS[u.role as AnyRole] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {ROLE_LABELS[u.role as AnyRole] ?? u.role}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">
@@ -242,6 +269,8 @@ function UserForm({ form, setForm, error, showPassword }: {
   error: string
   showPassword: boolean
 }) {
+  const [showPwd, setShowPwd] = useState(false)
+
   return (
     <div className="space-y-3">
       <div>
@@ -255,16 +284,80 @@ function UserForm({ form, setForm, error, showPassword }: {
       {showPassword && (
         <div>
           <label className="block text-xs text-gray-500 mb-1">Contraseña *</label>
-          <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="input-field text-sm w-full" />
+          <div className="relative">
+            <input
+              type={showPwd ? 'text' : 'password'}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              className="input-field text-sm w-full pr-9"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPwd(v => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       )}
       <div>
         <label className="block text-xs text-gray-500 mb-1">Rol</label>
-        <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as 'ADMIN' | 'SUPERADMIN' })} className="input-field text-sm w-full">
-          <option value="ADMIN">Admin</option>
-          <option value="SUPERADMIN">Superadmin</option>
+        <select
+          value={form.role}
+          onChange={(e) => setForm({ ...form, role: e.target.value as AnyRole, brokerType: 'PARTICULAR', companyName: '' })}
+          className="input-field text-sm w-full"
+        >
+          <optgroup label="Equipo interno">
+            <option value="ADMIN">Admin</option>
+            <option value="EDITOR">Editor</option>
+            <option value="SUPERADMIN">Superadmin</option>
+          </optgroup>
+          <optgroup label="Plataforma usados">
+            <option value="PROPIETARIO">Propietario</option>
+            <option value="BROKER">Broker</option>
+          </optgroup>
         </select>
       </div>
+
+      {/* Campos adicionales para BROKER */}
+      {form.role === 'BROKER' && (
+        <>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1.5">Tipo de broker</label>
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+              {(['PARTICULAR', 'EMPRESA'] as BrokerType[]).map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setForm({ ...form, brokerType: type, companyName: '' })}
+                  className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    form.brokerType === type
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {type === 'PARTICULAR' ? 'Particular' : 'Empresa'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.brokerType === 'EMPRESA' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Nombre de la empresa *</label>
+              <input
+                type="text"
+                value={form.companyName}
+                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                placeholder="Ej: Inmobiliaria XYZ Ltda."
+                className="input-field text-sm w-full"
+              />
+            </div>
+          )}
+        </>
+      )}
+
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )

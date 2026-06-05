@@ -18,11 +18,75 @@ model User {
   emailVerified DateTime?
   password      String?
   role          Role      @default(ADMIN)
+  brokerType    String?
+  companyName   String?
+  phone         String?
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  accounts       Account[]
+  sessions       Session[]
+  usedProperties UsedProperty[]
+}
+
+model UsedProperty {
+  id            String         @id @default(cuid())
+  ownerId       String
+  status        PropertyStatus @default(DRAFT)
+  currentStep   Int            @default(1)
+
+  address       String?
+  lat           Float?
+  lng           Float?
+  region        String?
+  commune       String?
+
+  sqmTotal      Float?
+  sqmUsable     Float?
+  sqmTerrace    Float?
+  bedrooms      Int?
+  bathrooms     Int?
+  parkingSpots  Int?
+  storageRooms  Int?
+  totalFloors   Int?
+  aptNumber     String?
+  unitsPerFloor Int?
+  floorNumber   Int?
+  towerNumber   String?
+  propertyType  String?
+  orientations  String[]
+  antiquity     Int?
+
+  amenities     String[]
+  security      String[]
+  securityType  String?
+  services      String[]
+  spaces        String[]
+  special       String[]
+  commonSpaces  String[]
+
+  title         String?
+  description   String?
+  videoUrl      String?
+  images        String[]
+  price         Float?
+  currency      String?        @default("UF")
+  commonExpenses Int?
+  isFeatured    Boolean        @default(false)
+  isArchived    Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
+
+enum PropertyStatus {
+  DRAFT
+  PENDING
+  AVAILABLE
+  BLOCKED
+  SUSPENDED
+  SOLD
 }
 
 model Account {
@@ -63,6 +127,8 @@ enum Role {
   ADMIN
   EDITOR
   SUPERADMIN
+  PROPIETARIO
+  BROKER
 }
 
 // ─── PROJECTS ─────────────────────────────────────────

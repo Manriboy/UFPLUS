@@ -13,17 +13,17 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: 'UFPlus | Tu socio en inversiones inmobiliarias',
-    template: '%s | UFPlus',
+    default: 'UFPLUS | Tu socio en inversiones inmobiliarias',
+    template: '%s | UFPLUS',
   },
   description:
-    'UFPlus es tu broker inmobiliario de confianza en Chile. Maximiza tu patrimonio con departamentos de inversión seleccionados por expertos.',
+    'UFPLUS es tu broker inmobiliario de confianza en Chile. Maximiza tu patrimonio con departamentos de inversión seleccionados por expertos.',
   keywords: ['inversión inmobiliaria', 'departamentos', 'Chile', 'broker inmobiliario', 'plusvalía'],
   openGraph: {
     type: 'website',
     locale: 'es_CL',
     url: 'https://ufplus.cl',
-    siteName: 'UFPlus',
+    siteName: 'UFPLUS',
   },
 }
 

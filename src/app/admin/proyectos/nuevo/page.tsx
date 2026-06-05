@@ -2,7 +2,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import ProjectForm from '@/components/admin/ProjectForm'
+import NuevoProyectoSwitch from '@/components/admin/NuevoProyectoSwitch'
 
 export const metadata: Metadata = { title: 'Nuevo Proyecto — Admin UFPlus' }
 
@@ -25,7 +25,7 @@ export default function NewProjectPage() {
         </p>
       </div>
 
-      <ProjectForm />
+      <NuevoProyectoSwitch />
     </div>
   )
 }

@@ -33,19 +33,26 @@ export async function POST(req: NextRequest) {
   if (!isSuperAdmin(session)) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   try {
-    const { name, email: rawEmail, password, role } = await req.json()
+    const { name, email: rawEmail, password, role, brokerType, companyName } = await req.json()
     const email = (rawEmail ?? '').trim().toLowerCase()
 
     if (!email || !password) return NextResponse.json({ error: 'Email y contraseña son requeridos' }, { status: 400 })
-    if (!['ADMIN', 'SUPERADMIN'].includes(role)) return NextResponse.json({ error: 'Rol inválido' }, { status: 400 })
+    if (!['ADMIN', 'SUPERADMIN', 'EDITOR', 'PROPIETARIO', 'BROKER'].includes(role)) return NextResponse.json({ error: 'Rol inválido' }, { status: 400 })
     if (password.length < 6) return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
+    if (role === 'BROKER' && brokerType === 'EMPRESA' && !companyName?.trim()) {
+      return NextResponse.json({ error: 'El nombre de la empresa es requerido' }, { status: 400 })
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) return NextResponse.json({ error: 'Ya existe un usuario con ese email' }, { status: 409 })
 
     const hashed = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
-      data: { name: name?.trim() || null, email, password: hashed, role },
+      data: {
+        name: name?.trim() || null, email, password: hashed, role,
+        brokerType: role === 'BROKER' ? (brokerType ?? 'PARTICULAR') : null,
+        companyName: role === 'BROKER' && brokerType === 'EMPRESA' ? companyName?.trim() || null : null,
+      },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     })
     return NextResponse.json({ user }, { status: 201 })
@@ -61,13 +68,12 @@ export async function PUT(req: NextRequest) {
   if (!isSuperAdmin(session)) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   try {
-    const { id, name, email: rawEmail, role, password } = await req.json()
+    const { id, name, email: rawEmail, role, password, brokerType, companyName } = await req.json()
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
     const target = await prisma.user.findUnique({ where: { id } })
     if (!target) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
 
-    // Si se degrada el único superadmin, bloquearlo
     if (target.role === 'SUPERADMIN' && role && role !== 'SUPERADMIN') {
       const superadminCount = await prisma.user.count({ where: { role: 'SUPERADMIN' } })
       if (superadminCount <= 1) {
@@ -75,10 +81,22 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    const effectiveRole = role ?? target.role
+    if (effectiveRole === 'BROKER' && brokerType === 'EMPRESA' && !companyName?.trim()) {
+      return NextResponse.json({ error: 'El nombre de la empresa es requerido' }, { status: 400 })
+    }
+
     const updateData: Record<string, unknown> = {}
     if (name !== undefined) updateData.name = name?.trim() || null
     if (rawEmail) updateData.email = rawEmail.trim().toLowerCase()
-    if (role && ['ADMIN', 'SUPERADMIN'].includes(role)) updateData.role = role
+    if (role && ['ADMIN', 'SUPERADMIN', 'EDITOR', 'PROPIETARIO', 'BROKER'].includes(role)) {
+      updateData.role = role
+      updateData.brokerType = role === 'BROKER' ? (brokerType ?? 'PARTICULAR') : null
+      updateData.companyName = role === 'BROKER' && brokerType === 'EMPRESA' ? companyName?.trim() || null : null
+    } else if (brokerType !== undefined && target.role === 'BROKER') {
+      updateData.brokerType = brokerType
+      updateData.companyName = brokerType === 'EMPRESA' ? companyName?.trim() || null : null
+    }
     if (password) {
       if (password.length < 6) return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
       updateData.password = await bcrypt.hash(password, 12)

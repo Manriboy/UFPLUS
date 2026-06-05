@@ -18,52 +18,97 @@ import {
   Megaphone,
   Database,
   ShieldAlert,
+  Home,
+  Building2,
   type LucideIcon,
 } from 'lucide-react'
 
-// ── Nav config (keys must match admin-nav.ts) ──────────
+// ── Roles ──────────────────────────────────────────────
 
-type Child = { key: string; label: string; href: string }
-type NavItem = { key: string; label: string; href: string; icon: LucideIcon; children?: Child[] }
+const STAFF    = ['ADMIN', 'EDITOR', 'SUPERADMIN']
+const VENDORS  = [...STAFF, 'BROKER']
+const ALL      = [...VENDORS, 'PROPIETARIO']
+
+// ── Nav config ─────────────────────────────────────────
+
+type Child   = { key: string; label: string; href: string; roles?: string[] }
+type NavItem = { key: string; label: string; href: string; icon: LucideIcon; roles?: string[]; children?: Child[] }
 
 const nav: NavItem[] = [
-  { key: 'dashboard',  label: 'Dashboard',          href: '/admin',               icon: LayoutDashboard },
-  { key: 'proyectos',  label: 'Proyectos',           href: '/admin/proyectos',     icon: FolderOpen,
+  // PROPIETARIO + BROKER
+  {
+    key: 'mis-publicaciones', label: 'Mis publicaciones', href: '/admin/mis-publicaciones',
+    icon: Home, roles: ['PROPIETARIO', 'BROKER'],
+  },
+  {
+    key: 'stock-usados', label: 'Stock usados', href: '/admin/stock-usados',
+    icon: Building2, roles: ['BROKER'],
+  },
+  // Staff only
+  {
+    key: 'dashboard', label: 'Dashboard', href: '/admin',
+    icon: LayoutDashboard, roles: STAFF,
+  },
+  {
+    key: 'proyectos', label: 'Proyectos', href: '/admin/proyectos',
+    icon: FolderOpen, roles: STAFF,
     children: [
-      { key: 'proyectos.todos', label: 'Todos los proyectos', href: '/admin/proyectos' },
-      { key: 'proyectos.nuevo', label: 'Nuevo proyecto',      href: '/admin/proyectos/nuevo' },
+      { key: 'proyectos.nuevos',       label: 'Departamentos',  href: '/admin/proyectos',                      roles: STAFF },
+      { key: 'proyectos.aprobaciones', label: 'Aprobaciones',   href: '/admin/proyectos/aprobaciones',         roles: STAFF },
     ],
   },
-  { key: 'leads',      label: 'Leads / Consultas',   href: '/admin/leads',         icon: Inbox },
-  { key: 'sync_stock', label: 'Sync de Stock',        href: '/admin/stock',         icon: RefreshCw },
-  { key: 'stock_ufplus', label: 'Stock UFPLUS',       href: '/admin/stock-unificado', icon: Database,
+  {
+    key: 'leads', label: 'Leads / Consultas', href: '/admin/leads',
+    icon: Inbox, roles: STAFF,
+  },
+  {
+    key: 'sync_stock', label: 'Sync de Stock', href: '/admin/stock',
+    icon: RefreshCw, roles: STAFF,
+  },
+  {
+    key: 'stock_ufplus', label: 'Stock UFPLUS', href: '/admin/stock-unificado',
+    icon: Database, roles: STAFF,
     children: [
       { key: 'stock_ufplus.unificado', label: 'Stock unificado', href: '/admin/stock-unificado' },
       { key: 'stock_ufplus.online',    label: 'Stock online',    href: '/admin/search' },
       { key: 'stock_ufplus.offline',   label: 'Stock off-line',  href: '/admin/search2' },
     ],
   },
-  { key: 'banner',     label: 'Banner publicitario', href: '/admin/banner',        icon: Megaphone },
+  {
+    key: 'banner', label: 'Banner publicitario', href: '/admin/banner',
+    icon: Megaphone, roles: STAFF,
+  },
 ]
 
 // ── Component ─────────────────────────────────────────
 
 export default function AdminSidebar() {
-  const pathname = usePathname()
+  const pathname  = usePathname()
   const { data: session } = useSession()
-  const isSuperAdmin = session?.user?.role === 'SUPERADMIN'
+  const role       = (session?.user?.role as string) ?? 'ADMIN'
+  const isSuperAdmin = role === 'SUPERADMIN'
 
-  const [flags, setFlags] = useState<Record<string, boolean> | null>(null)
+  const [flags, setFlags] = useState<Record<string, boolean> | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const v = localStorage.getItem('uf-admin-flags')
+      return v ? JSON.parse(v) : null
+    } catch { return null }
+  })
 
   useEffect(() => {
     fetch('/api/admin/superadmin/flags')
       .then(r => r.json())
-      .then(({ flags: loaded }: { flags: Record<string, boolean> }) => setFlags(loaded))
+      .then((data: { flags?: Record<string, boolean> }) => {
+        const f = data.flags ?? {}
+        setFlags(f)
+        try { localStorage.setItem('uf-admin-flags', JSON.stringify(f)) } catch {}
+      })
       .catch(() => setFlags({}))
   }, [])
 
-  // Default: enabled when flags not yet loaded or key absent
-  const isEnabled = (key: string) => flags === null || flags[key] !== false
+  const isEnabled  = (key: string) => flags === null || flags[key] !== false
+  const hasRole    = (roles?: string[]) => !roles || roles.includes(role)
 
   const isActive = (href: string) =>
     href === '/admin' ? pathname === href : pathname === href || pathname.startsWith(href + '/')
@@ -73,10 +118,11 @@ export default function AdminSidebar() {
     (item.children?.some(c => pathname === c.href || pathname.startsWith(c.href + '/')) ?? false)
 
   const visibleNav = nav
-    .filter(item => isEnabled(item.key))
+    .filter(item => hasRole(item.roles) && isEnabled(item.key))
     .map(item => ({
       ...item,
-      children: item.children?.filter(c => isEnabled(c.key)),
+      children: item.children
+        ?.filter(c => hasRole(c.roles) && isEnabled(c.key)),
     }))
 
   return (
@@ -92,20 +138,22 @@ export default function AdminSidebar() {
           priority
         />
         <p className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-          Admin
+          {role === 'PROPIETARIO' ? 'Propietario' : role === 'BROKER' ? 'Broker' : 'Admin'}
         </p>
       </Link>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {visibleNav.map((item) => {
-          const Icon = item.icon
+          const Icon   = item.icon
           const active = isGroupActive(item)
 
           return (
             <div key={item.key}>
               <Link
-                href={item.href}
+                href={item.key === 'proyectos' && role === 'BROKER'
+                  ? '/admin/proyectos?categoria=usados'
+                  : item.href}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors',
                   active
@@ -143,7 +191,7 @@ export default function AdminSidebar() {
           )
         })}
 
-        {/* Superadmin group — solo visible para SUPERADMIN */}
+        {/* Superadmin — solo SUPERADMIN */}
         {isSuperAdmin && <SuperadminGroup pathname={pathname} isActive={isActive} />}
       </nav>
 
@@ -175,29 +223,20 @@ export default function AdminSidebar() {
 // ── Superadmin group ───────────────────────────────────
 
 const SUPERADMIN_CHILDREN = [
-  { label: 'Flags de Admin',      href: '/admin/superadmin/flags' },
   { label: 'Control de usuarios', href: '/admin/usuarios' },
+  { label: 'Flags de Admin',      href: '/admin/superadmin/flags' },
 ]
 
-function SuperadminGroup({
-  pathname,
-  isActive,
-}: {
-  pathname: string
-  isActive: (href: string) => boolean
-}) {
-  const active =
-    isActive('/admin/superadmin') || isActive('/admin/usuarios')
+function SuperadminGroup({ pathname, isActive }: { pathname: string; isActive: (href: string) => boolean }) {
+  const active = isActive('/admin/superadmin') || isActive('/admin/usuarios')
 
   return (
     <div>
       <Link
-        href="/admin/superadmin/flags"
+        href="/admin/usuarios"
         className={cn(
           'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors',
-          active
-            ? 'bg-brand-primary text-white'
-            : 'text-gray-600 hover:bg-gray-100 hover:text-brand-text'
+          active ? 'bg-brand-primary text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-brand-text'
         )}
       >
         <ShieldAlert className="h-4 w-4 flex-shrink-0" />
@@ -207,7 +246,7 @@ function SuperadminGroup({
 
       {active && (
         <div className="ml-7 mt-0.5 space-y-0.5">
-          {SUPERADMIN_CHILDREN.map((child) => (
+          {SUPERADMIN_CHILDREN.map(child => (
             <Link
               key={child.href}
               href={child.href}

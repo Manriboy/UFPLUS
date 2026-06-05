@@ -1,6 +1,7 @@
 // src/app/login/page.tsx
 'use client'
 import { useState } from 'react'
+import Image from 'next/image'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -34,8 +35,7 @@ export default function LoginPage() {
     if (result?.error) {
       setError('Email o contraseña incorrectos.')
     } else {
-      router.push('/admin')
-      router.refresh()
+      window.location.href = '/admin'
     }
   }
 
@@ -43,9 +43,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-brand-surface flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-1 mb-4">
-            <span className="font-display text-3xl font-bold text-brand-primary">UF</span>
-            <span className="font-display text-3xl font-bold text-brand-secondary">Plus</span>
+          <div className="flex justify-center mb-3">
+            <Image src="/logos/admin-logo.png" alt="UFPLUS" width={180} height={76} priority className="h-auto" />
           </div>
           <p className="text-brand-secondary text-sm">Panel de administración</p>
         </div>
