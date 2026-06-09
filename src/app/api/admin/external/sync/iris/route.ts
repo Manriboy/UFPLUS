@@ -1,4 +1,7 @@
 // src/app/api/admin/external/sync/iris/route.ts
+export const maxDuration = 300 // Vercel Pro: hasta 5 min
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -40,11 +43,18 @@ async function getToken(): Promise<string | null> {
 }
 
 async function fetchPage(page: number, token: string): Promise<Response> {
-  return fetch(IRIS_SEARCH_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Origin: 'https://iris.yapo.cl', Referer: 'https://iris.yapo.cl/' },
-    body: JSON.stringify({ limit: PAGE_SIZE, page, filter: { country: [7], project_status: [1, 2, 3], operation_type: 'Venta', identifiers: [], level: '2' }, order: ['promos', 'popularity'] }),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 30_000)
+  try {
+    return await fetch(IRIS_SEARCH_URL, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, Origin: 'https://iris.yapo.cl', Referer: 'https://iris.yapo.cl/' },
+      body: JSON.stringify({ limit: PAGE_SIZE, page, filter: { country: [7], project_status: [1, 2, 3], operation_type: 'Venta', identifiers: [], level: '2' }, order: ['promos', 'popularity'] }),
+    })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 // ── Retry helper ─────────────────────────────────────────
