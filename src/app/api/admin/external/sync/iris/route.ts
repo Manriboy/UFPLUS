@@ -216,21 +216,36 @@ export async function GET() {
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
+      const enq = (chunk: string) => { try { controller.enqueue(encoder.encode(chunk)) } catch {} }
       const send = (progress: number, message: string, extra?: object) => {
-        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress, message, ...extra })}\n\n`)) } catch {}
+        enq(`data: ${JSON.stringify({ progress, message, ...extra })}\n\n`)
       }
+
+      // Ping inicial para establecer conexión inmediatamente
+      enq(': connected\n\n')
+
+      // Keepalive cada 8s para evitar que proxies intermedios cierren la conexión
+      const heartbeat = setInterval(() => enq(': ping\n\n'), 8_000)
+
       try {
         const result = await runSync(send)
         send(100, `Listo · ${result.unitsSynced} unidades · ${result.newProjects} nuevos`, { done: true, result })
       } catch (e) {
         send(-1, e instanceof Error ? e.message : 'Error desconocido', { error: true })
+      } finally {
+        clearInterval(heartbeat)
       }
       controller.close()
     },
   })
 
   return new Response(stream, {
-    headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' },
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
   })
 }
 
