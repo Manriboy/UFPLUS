@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { assignAndMergeCanonical } from '@/lib/canonical-merge'
+import crypto from 'crypto'
 
 const JB_BASE = 'https://app.jetbrokers.io/api'
 const JB_VERSION = '7.42.0'
@@ -71,6 +72,47 @@ async function fetchUnits(slug: string, token: string): Promise<unknown[] | null
   return data.apartments ?? []
 }
 
+// ── Cloudinary: cachear cover de JetBrokers permanentemente ──────────────
+
+async function uploadCoverToCloudinary(coverId: string): Promise<string | null> {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+  const apiKey = process.env.CLOUDINARY_API_KEY
+  const apiSecret = process.env.CLOUDINARY_API_SECRET
+  if (!cloudName || !apiKey || !apiSecret) return null
+
+  try {
+    const imgRes = await fetch(`https://app.jetbrokers.io/api/file-unauthenticated/download/${coverId}`)
+    if (!imgRes.ok) return null
+    const buffer = await imgRes.arrayBuffer()
+
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const folder = 'ufplus/gcp'
+    const publicId = `jb_${coverId}`
+    // Parámetros en orden alfabético para firma Cloudinary
+    const paramsStr = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}`
+    const signature = crypto.createHash('sha1').update(paramsStr + apiSecret).digest('hex')
+
+    const form = new FormData()
+    form.append('file', new Blob([buffer]), 'cover.jpg')
+    form.append('api_key', apiKey)
+    form.append('timestamp', timestamp)
+    form.append('folder', folder)
+    form.append('public_id', publicId)
+    form.append('signature', signature)
+
+    const upRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: form,
+    })
+    if (!upRes.ok) return null
+    const data = await upRes.json()
+    // Insertar transformación de compresión en la URL final
+    return (data.secure_url as string).replace('/upload/', '/upload/c_limit,w_1200,q_80,f_jpg/')
+  } catch {
+    return null
+  }
+}
+
 // ── Retry helper ─────────────────────────────────────────
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 800): Promise<T> {
@@ -91,7 +133,12 @@ async function upsertNewProject(slug: string, bestPriceMap: Map<string, number |
 
   const lat = workview.gpsLat ? parseFloat(workview.gpsLat) : null
   const lng = workview.gpsLon ? parseFloat(workview.gpsLon) : null
-  const imageUrl = workview.cover ? `https://app.jetbrokers.io/api/file-unauthenticated/download/${workview.cover}` : null
+  const fallbackUrl = workview.cover
+    ? `https://app.jetbrokers.io/api/file-unauthenticated/download/${workview.cover}`
+    : null
+  const imageUrl = workview.cover
+    ? (await uploadCoverToCloudinary(workview.cover)) ?? fallbackUrl
+    : null
 
   const base = {
     name: (workview.name ?? slug).trim(),
@@ -213,7 +260,31 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
   const newSlugs = allSlugs.filter(s => !existingIds.has(s))
   send(10, `${newSlugs.length} nuevos · ${staleIds.length} eliminados`)
 
-  // Nuevos proyectos secuencial: 10% → 20%
+  // Migrar imágenes existentes sin Cloudinary (one-time, una vez subidas no se repite)
+  const toMigrate = await prisma.externalProject.findMany({
+    where: {
+      source: 'jetbrokers',
+      imageUrl: { not: null },
+      NOT: { imageUrl: { startsWith: 'https://res.cloudinary.com' } },
+    },
+    select: { id: true, imageUrl: true },
+  })
+  if (toMigrate.length > 0) {
+    send(11, `Migrando ${toMigrate.length} imágenes a Cloudinary...`)
+    let migrated = 0
+    for (const proj of toMigrate) {
+      const coverId = proj.imageUrl!.split('/').pop()
+      if (!coverId) continue
+      const cloudinaryUrl = await uploadCoverToCloudinary(coverId)
+      if (cloudinaryUrl) {
+        await prisma.externalProject.update({ where: { id: proj.id }, data: { imageUrl: cloudinaryUrl } })
+        migrated++
+      }
+    }
+    send(13, `${migrated}/${toMigrate.length} imágenes migradas a Cloudinary`)
+  }
+
+  // Nuevos proyectos secuencial: ~13% → 20%
   let newProjectsCount = 0
   for (let i = 0; i < newSlugs.length; i++) {
     await upsertNewProject(newSlugs[i], bestPriceMap, token)

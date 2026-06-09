@@ -12,15 +12,13 @@ const INITIAL: SyncState = { status: 'idle', progress: 0, message: '' }
 // ── Definición de fuentes por sección ────────────────────
 
 const DAILY_SOURCES = [
-  { key: 'iris-daily',       label: 'AWS',   description: 'Renueva token + precios',   url: '/api/admin/external/sync/iris/daily' },
-  { key: 'brouk-daily',      label: 'Drive', description: 'Renueva links de imágenes', url: '/api/admin/external/sync/brouk' },
-  { key: 'jetbrokers-daily', label: 'GCP',   description: 'Renueva token automático',  url: '/api/admin/external/sync/jetbrokers/daily' },
+  { key: 'iris-daily',  label: 'AWS',   description: 'Renueva token + precios',   url: '/api/admin/external/sync/iris/daily' },
+  { key: 'brouk-daily', label: 'Drive', description: 'Renueva links de imágenes', url: '/api/admin/external/sync/brouk' },
 ] as const
 
 const WEEKLY_SOURCES = [
-  { key: 'iris',       label: 'AWS',   description: 'Proyectos + unidades completo', url: '/api/admin/external/sync/iris' },
-  { key: 'brouk',      label: 'Drive', description: 'Proyectos completo',            url: '/api/admin/external/sync/brouk' },
-  { key: 'jetbrokers', label: 'GCP',   description: 'Proyectos completo',            url: '/api/admin/external/sync/jetbrokers' },
+  { key: 'iris',  label: 'AWS',   description: 'Proyectos + unidades completo', url: '/api/admin/external/sync/iris' },
+  { key: 'brouk', label: 'Drive', description: 'Proyectos completo',            url: '/api/admin/external/sync/brouk' },
 ] as const
 
 type DailyKey = typeof DAILY_SOURCES[number]['key']
@@ -30,7 +28,6 @@ type AnyKey = DailyKey | WeeklyKey
 const SOURCE_COLORS: Record<string, string> = {
   AWS: 'bg-orange-500 text-white',
   Drive: 'bg-blue-600 text-white',
-  GCP: 'bg-sky-400 text-white',
 }
 
 // ── Lógica de streaming SSE ───────────────────────────────
@@ -238,7 +235,7 @@ export default function SyncPanel() {
                 onRunAll={runAllDaily}
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {DAILY_SOURCES.map(s => (
                 <SyncCard
                   key={s.key}
@@ -275,7 +272,7 @@ export default function SyncPanel() {
                 onRunAll={runAllWeekly}
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {WEEKLY_SOURCES.map(s => (
                 <SyncCard
                   key={s.key}

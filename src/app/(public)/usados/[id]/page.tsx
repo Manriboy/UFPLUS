@@ -1,25 +1,41 @@
 // src/app/(public)/usados/[id]/page.tsx
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import ContactForm from '@/components/public/ContactForm'
+import ProjectCarousel from '@/components/public/ProjectCarousel'
+import NearbyServices, { type NearbyServicesData, type POI } from '@/components/public/NearbyServices'
 import { MapPin, ChevronRight, Bed, Bath, Car, Archive, Play, CheckCircle } from 'lucide-react'
-import { formatPrice, getEmbedUrl } from '@/lib/utils'
+import { getEmbedUrl } from '@/lib/utils'
+import { getIndicadores } from '@/lib/indicadores'
 
 interface Props {
   params: { id: string }
 }
 
-async function getProperty(id: string) {
+const PREVIEW_ROLES = ['ADMIN', 'SUPERADMIN', 'EDITOR', 'BROKER', 'PROPIETARIO']
+
+async function canPreview() {
+  const session = await getServerSession(authOptions)
+  return PREVIEW_ROLES.includes((session?.user?.role as string) ?? '')
+}
+
+async function getProperty(id: string, allowPending = false) {
   return prisma.usedProperty.findFirst({
-    where: { id, status: 'AVAILABLE', isArchived: false },
+    where: {
+      id,
+      isArchived: false,
+      ...(allowPending ? {} : { status: 'AVAILABLE' }),
+    },
   })
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const property = await getProperty(params.id)
+  const preview = await canPreview()
+  const property = await getProperty(params.id, preview)
   if (!property) return { title: 'Publicación no encontrada' }
   const title = property.title || `Departamento en ${property.commune ?? property.region ?? 'Chile'}`
   return {
@@ -36,14 +52,109 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export const revalidate = false
 export const dynamicParams = true
 
+// ─── HERE Nearby Services ─────────────────────────────
+
+const HERE_CATEGORIES: Record<keyof NearbyServicesData, string> = {
+  transporte:  '400-4300',
+  educacion:   '600-6400',
+  areasVerdes: '550-5510',
+  comercios:   '600-6300-0066,600-6000-0061,600-6300-0082',
+  salud:       '800-8000',
+}
+
+const HERE_CATEGORY_LABELS: Record<string, string> = {
+  '400-4300-0035': 'Metro',
+  '400-4300-0036': 'Paradero',
+  '400-4300':      'Transporte público',
+  '600-6400-0000': 'Colegio',
+  '600-6400-0001': 'Universidad',
+  '600-6400-0062': 'Jardín infantil',
+  '600-6400':      'Educación',
+  '550-5510':      'Área verde',
+  '600-6300-0066': 'Supermercado',
+  '600-6000-0061': 'Farmacia',
+  '600-6300-0082': 'Centro comercial',
+  '800-8000-0159': 'Hospital',
+  '800-8000-0001': 'Clínica',
+  '800-8000':      'Salud',
+}
+
+function categoryLabel(categories: Array<{ id: string; name: string }> | undefined): string | undefined {
+  if (!categories?.length) return undefined
+  for (const cat of categories) {
+    if (HERE_CATEGORY_LABELS[cat.id]) return HERE_CATEGORY_LABELS[cat.id]
+  }
+  return categories[0]?.name
+}
+
+async function fetchHereTab(lat: number, lng: number, tab: keyof NearbyServicesData, apiKey: string): Promise<POI[]> {
+  try {
+    const url = new URL('https://browse.search.hereapi.com/v1/browse')
+    url.searchParams.set('at', `${lat},${lng}`)
+    url.searchParams.set('in', `circle:${lat},${lng};r=2000`)
+    url.searchParams.set('limit', '20')
+    url.searchParams.set('categories', HERE_CATEGORIES[tab])
+    url.searchParams.set('apiKey', apiKey)
+
+    const res = await fetch(url.toString(), { next: { revalidate: false } })
+    if (!res.ok) return []
+    const json = await res.json() as { items?: Array<{ title: string; distance: number; categories?: Array<{ id: string; name: string }> }> }
+    return (json.items ?? []).map(item => ({
+      title: item.title,
+      distance: item.distance,
+      category: categoryLabel(item.categories),
+    }))
+  } catch {
+    return []
+  }
+}
+
+async function fetchNearbyServices(lat: number, lng: number): Promise<NearbyServicesData | null> {
+  const apiKey = process.env.NEXT_PUBLIC_HERE_API_KEY
+  if (!apiKey) return null
+
+  const tabs = Object.keys(HERE_CATEGORIES) as Array<keyof NearbyServicesData>
+  const results = await Promise.all(tabs.map(tab => fetchHereTab(lat, lng, tab, apiKey)))
+
+  return {
+    transporte:  results[0],
+    educacion:   results[1],
+    areasVerdes: results[2],
+    comercios:   results[3],
+    salud:       results[4],
+  }
+}
+
 export default async function UsadoDetailPage({ params }: Props) {
-  const property = await getProperty(params.id)
+  const [preview, indicadores] = await Promise.all([canPreview(), getIndicadores()])
+  const property = await getProperty(params.id, preview)
   if (!property) notFound()
 
+  const nearbyServices = property.lat && property.lng
+    ? await fetchNearbyServices(property.lat, property.lng)
+    : null
+
   const title = property.title || `Departamento en ${property.commune ?? property.region ?? 'Chile'}`
-  const mainImage = property.images[0] ?? null
-  const galleryImages = property.images.slice(1)
+  const carouselImages = property.images.map(url => ({ url, alt: title }))
   const embedUrl = property.videoUrl ? getEmbedUrl(property.videoUrl) : null
+
+  // Precios en UF y CLP
+  const ufRate  = indicadores?.uf.valor ?? null
+  const usdRate = indicadores?.dolar.valor ?? null
+
+  function toPrices(price: number | null, currency: string | null) {
+    if (!price) return { uf: null, clp: null }
+    const curr = currency ?? 'UF'
+    if (curr === 'UF')   return { uf: price, clp: ufRate  ? Math.round(price * ufRate)  : null }
+    if (curr === 'CLP$') return { uf: ufRate ? price / ufRate : null, clp: Math.round(price) }
+    if (curr === 'USD$') {
+      const clp = usdRate ? Math.round(price * usdRate) : null
+      return { uf: clp && ufRate ? clp / ufRate : null, clp }
+    }
+    return { uf: price, clp: null }
+  }
+
+  const { uf: ufPrice, clp: clpPrice } = toPrices(property.price, property.currency)
 
   const mapUrl =
     property.lat && property.lng
@@ -57,14 +168,14 @@ export default async function UsadoDetailPage({ params }: Props) {
     { label: 'Bodegas',          value: property.storageRooms,icon: <Archive className="w-4 h-4 text-brand-primary" /> },
   ].filter(s => s.value != null && s.value > 0)
 
-  const allAmenities = [
-    ...property.amenities,
-    ...property.security,
-    ...property.services,
-    ...property.spaces,
-    ...property.special,
-    ...property.commonSpaces,
-  ]
+  const amenityGroups = [
+    { label: 'Comodidades',          items: property.amenities    },
+    { label: 'Seguridad',            items: property.security     },
+    { label: 'Servicios',            items: property.services     },
+    { label: 'Espacios interiores',  items: property.spaces       },
+    { label: 'Especiales',           items: property.special      },
+    { label: 'Espacios comunes',     items: property.commonSpaces },
+  ].filter(g => g.items.length > 0)
 
   return (
     <div className="min-h-screen bg-white pt-20">
@@ -121,34 +232,9 @@ export default async function UsadoDetailPage({ params }: Props) {
               )}
             </div>
 
-            {/* Main image */}
-            {mainImage && (
-              <div className="relative h-72 sm:h-96 overflow-hidden bg-gray-100">
-                <Image
-                  src={mainImage}
-                  alt={title}
-                  fill className="object-cover" priority
-                  sizes="(max-width: 1024px) 100vw, 66vw"
-                />
-              </div>
-            )}
-
-            {/* Gallery */}
-            {galleryImages.length > 0 && (
-              <div>
-                <h2 className="font-display text-xl font-semibold text-brand-text mb-4">Galería</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {galleryImages.slice(0, 6).map((url, i) => (
-                    <div key={url} className="relative h-40 overflow-hidden bg-gray-100">
-                      <Image
-                        src={url} alt={`${title} - imagen ${i + 2}`}
-                        fill className="object-cover hover:scale-105 transition-transform duration-300"
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Carousel */}
+            {carouselImages.length > 0 && (
+              <ProjectCarousel images={carouselImages} projectName={title} />
             )}
 
             {/* Video */}
@@ -228,9 +314,9 @@ export default async function UsadoDetailPage({ params }: Props) {
             </div>
 
             {/* Amenities */}
-            {allAmenities.length > 0 && (
+            {amenityGroups.length > 0 && (
               <div>
-                <h2 className="font-display text-xl font-semibold text-brand-text mb-4 flex items-center gap-2">
+                <h2 className="font-display text-xl font-semibold text-brand-text mb-6 flex items-center gap-2">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-brand-primary shrink-0">
                     <path d="M5 11a7 7 0 0 1 14 0" />
                     <line x1="4" y1="11" x2="20" y2="11" />
@@ -243,11 +329,18 @@ export default async function UsadoDetailPage({ params }: Props) {
                   </svg>
                   Características adicionales
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {allAmenities.map(a => (
-                    <div key={a} className="flex items-center gap-2.5 p-3 bg-brand-surface">
-                      <CheckCircle className="w-4 h-4 text-brand-primary shrink-0" />
-                      <span className="text-sm text-brand-secondary">{a}</span>
+                <div className="space-y-6">
+                  {amenityGroups.map(group => (
+                    <div key={group.label}>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{group.label}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {group.items.map(a => (
+                          <div key={a} className="flex items-center gap-2.5 p-3 bg-brand-surface">
+                            <CheckCircle className="w-4 h-4 text-brand-primary shrink-0" />
+                            <span className="text-sm text-brand-secondary">{a}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -260,13 +353,18 @@ export default async function UsadoDetailPage({ params }: Props) {
             <div className="bg-brand-surface text-gray-900 p-6 border border-gray-200">
               <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Precio</p>
               <p className="font-display text-4xl font-bold text-brand-primary mb-1">
-                {property.price
-                  ? formatPrice(property.price, property.currency || 'UF')
+                {ufPrice != null
+                  ? `${ufPrice.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} UF`
                   : 'Consultar'}
               </p>
+              {clpPrice != null && (
+                <p className="text-sm font-semibold text-gray-700 mb-1">
+                  $ {clpPrice.toLocaleString('es-CL')}
+                </p>
+              )}
               {property.commonExpenses != null && (
                 <p className="text-xs text-gray-400 mb-1">
-                  + GC ${property.commonExpenses.toLocaleString('es-CL')} / mes
+                  Gastos comunes: ${property.commonExpenses.toLocaleString('es-CL')} / mes
                 </p>
               )}
               {property.commune && (
@@ -326,6 +424,9 @@ export default async function UsadoDetailPage({ params }: Props) {
           </div>
         </div>
       )}
+
+      {/* Servicios básicos */}
+      {nearbyServices && <NearbyServices data={nearbyServices} />}
     </div>
   )
 }

@@ -37,12 +37,12 @@ type NavItem = { key: string; label: string; href: string; icon: LucideIcon; rol
 const nav: NavItem[] = [
   // PROPIETARIO + BROKER
   {
-    key: 'mis-publicaciones', label: 'Mis publicaciones', href: '/admin/mis-publicaciones',
-    icon: Home, roles: ['PROPIETARIO', 'BROKER'],
-  },
-  {
     key: 'stock-usados', label: 'Stock usados', href: '/admin/stock-usados',
     icon: Building2, roles: ['BROKER'],
+  },
+  {
+    key: 'mis-publicaciones', label: 'Mis publicaciones', href: '/admin/mis-publicaciones',
+    icon: Home, roles: ['PROPIETARIO', 'BROKER'],
   },
   // Staff only
   {
@@ -69,9 +69,10 @@ const nav: NavItem[] = [
     key: 'stock_ufplus', label: 'Stock UFPLUS', href: '/admin/stock-unificado',
     icon: Database, roles: STAFF,
     children: [
-      { key: 'stock_ufplus.unificado', label: 'Stock unificado', href: '/admin/stock-unificado' },
-      { key: 'stock_ufplus.online',    label: 'Stock online',    href: '/admin/search' },
-      { key: 'stock_ufplus.offline',   label: 'Stock off-line',  href: '/admin/search2' },
+      { key: 'stock_ufplus.nuevos',  label: 'Stock nuevos',   href: '/admin/stock-unificado', roles: STAFF },
+      { key: 'stock_ufplus.usados',  label: 'Stock usados',   href: '/admin/stock-usados',    roles: STAFF },
+      { key: 'stock_ufplus.online',  label: 'Stock online',   href: '/admin/search' },
+      { key: 'stock_ufplus.offline', label: 'Stock off-line', href: '/admin/search2' },
     ],
   },
   {
@@ -85,7 +86,7 @@ const nav: NavItem[] = [
 export default function AdminSidebar() {
   const pathname  = usePathname()
   const { data: session } = useSession()
-  const role       = (session?.user?.role as string) ?? 'ADMIN'
+  const role       = (session?.user?.role as string) ?? ''
   const isSuperAdmin = role === 'SUPERADMIN'
 
   const [flags, setFlags] = useState<Record<string, boolean> | null>(() => {

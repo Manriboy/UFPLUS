@@ -1,11 +1,11 @@
 // src/app/(public)/proyectos/[slug]/page.tsx
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
 import ContactForm from '@/components/public/ContactForm'
 import ProjectCard from '@/components/public/ProjectCard'
+import ProjectCarousel from '@/components/public/ProjectCarousel'
 import {
   MapPin, CheckCircle, Play,
   Building2, BadgeDollarSign, ChevronRight,
@@ -72,8 +72,7 @@ export default async function ProjectDetailPage({ params }: Props) {
   if (!project) notFound()
 
   const related = await getRelated(project.commune, project.id)
-  const mainImage = project.images.find((i) => i.isMain) || project.images[0]
-  const galleryImages = project.images.filter((i) => i.id !== mainImage?.id)
+  const carouselImages = project.images.map(i => ({ url: i.url, alt: i.alt || '' }))
   const deliveryLabel = DELIVERY_TYPE_LABELS[project.deliveryType]
   const deliveryColor = DELIVERY_TYPE_COLORS[project.deliveryType]
   const embedUrl = project.videoUrl ? getEmbedUrl(project.videoUrl, project.videoType) : null
@@ -124,32 +123,8 @@ export default async function ProjectDetailPage({ params }: Props) {
               </div>
             </div>
 
-            {mainImage && (
-              <div className="relative h-72 sm:h-96 overflow-hidden bg-gray-100">
-                <Image
-                  src={mainImage.url}
-                  alt={mainImage.alt || project.name}
-                  fill className="object-cover" priority
-                  sizes="(max-width: 1024px) 100vw, 66vw"
-                />
-              </div>
-            )}
-
-            {galleryImages.length > 0 && (
-              <div>
-                <h2 className="font-display text-xl font-semibold text-brand-text mb-4">Galería</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {galleryImages.slice(0, 6).map((img, i) => (
-                    <div key={img.id} className="relative h-40 overflow-hidden bg-gray-100">
-                      <Image
-                        src={img.url} alt={img.alt || `${project.name} - imagen ${i + 2}`}
-                        fill className="object-cover hover:scale-105 transition-transform duration-300"
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {carouselImages.length > 0 && (
+              <ProjectCarousel images={carouselImages} projectName={project.name} />
             )}
 
             {embedUrl && (

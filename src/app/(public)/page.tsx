@@ -6,6 +6,7 @@ import Image from 'next/image'
 import prisma from '@/lib/prisma'
 import ProjectCard from '@/components/public/ProjectCard'
 import ContactForm from '@/components/public/ContactForm'
+import StatsSection from '@/components/public/StatsSection'
 import {
   TrendingUp,
   Shield,
@@ -248,21 +249,7 @@ export default async function HomePage() {
       {/* ─── STATS ─────────────────────────────────────────── */}
       <section className="bg-[#0D0D0D] py-10">
         <div className="container-section">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-8 border-t border-white/10 pt-10">
-            {[
-              { value: '+150', label: 'Proyectos analizados' },
-              { value: '+40', label: 'Inmobiliarias' },
-              { value: '+30', label: 'Comunas en todo el país' },
-              { value: '+150', label: 'Clientes satisfechos' },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <p className="font-sans text-3xl sm:text-4xl font-bold text-white mb-1">
-                  {stat.value}
-                </p>
-                <p className="text-gray-400 text-sm">{stat.label}</p>
-              </div>
-            ))}
-          </div>
+          <StatsSection />
         </div>
       </section>
 

@@ -2,7 +2,7 @@
 // src/components/admin/NuevoUsadoForm.tsx
 import { useState, useRef, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { CheckCircle2, ChevronRight, Loader2, MapPin, Home, Sparkles, Camera, X } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Loader2, MapPin, Home, Sparkles, Camera, X, GripVertical, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const SinglePinMap = dynamic(() => import('./SinglePinMap'), { ssr: false })
@@ -564,15 +564,10 @@ async function resizeToJpeg(file: File, maxPx = 1920, quality = 0.85): Promise<B
 async function uploadToCloudinary(blob: Blob): Promise<string> {
   const fd = new FormData()
   fd.append('file', blob, 'photo.jpg')
-  fd.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? 'ufplus-projects')
-  fd.append('folder', 'ufplus-usados')
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
-    { method: 'POST', body: fd }
-  )
+  const res = await fetch('/api/admin/usados/upload', { method: 'POST', body: fd })
   const json = await res.json()
-  if (!json.secure_url) throw new Error('Upload fallido')
-  return json.secure_url as string
+  if (!json.url) throw new Error(json.error || 'Upload fallido')
+  return json.url as string
 }
 
 // ─── Paso 6: Fotos ────────────────────────────────────
@@ -586,6 +581,7 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const dragSrc = useRef<number | null>(null)
 
   const handleFiles = async (files: FileList) => {
     if (!files.length) return
@@ -606,6 +602,24 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
 
   const remove = (idx: number) => {
     onImagesChange(images.filter((_, i) => i !== idx))
+  }
+
+  const setPrincipal = (idx: number) => {
+    if (idx === 0) return
+    const arr = [...images]
+    const [item] = arr.splice(idx, 1)
+    arr.unshift(item)
+    onImagesChange(arr)
+  }
+
+  const handleDrop = (targetIdx: number) => {
+    const src = dragSrc.current
+    if (src === null || src === targetIdx) return
+    const arr = [...images]
+    const [item] = arr.splice(src, 1)
+    arr.splice(targetIdx, 0, item)
+    onImagesChange(arr)
+    dragSrc.current = null
   }
 
   return (
@@ -643,19 +657,41 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
       {images.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
           {images.map((url, i) => (
-            <div key={url} className="relative group aspect-square">
+            <div
+              key={url}
+              className="relative group aspect-square cursor-grab active:cursor-grabbing"
+              draggable={true}
+              onDragStart={() => { dragSrc.current = i }}
+              onDragOver={e => e.preventDefault()}
+              onDrop={() => handleDrop(i)}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
+              <img src={url} alt="" className="w-full h-full object-cover rounded-lg pointer-events-none" />
+              {/* Drag handle */}
+              <div className="absolute top-1 left-1 bg-black/40 text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
+                <GripVertical className="h-3 w-3" />
+              </div>
+              {/* Delete */}
               <button
                 type="button" onClick={() => remove(i)}
                 className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="h-3 w-3" />
               </button>
-              {i === 0 && (
+              {/* Principal badge / set principal */}
+              {i === 0 ? (
                 <span className="absolute bottom-1 left-1 text-[10px] bg-brand-primary text-white px-1.5 py-0.5 rounded font-semibold">
                   Principal
                 </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPrincipal(i)}
+                  title="Establecer como principal"
+                  className="absolute bottom-1 left-1 bg-black/60 text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-brand-primary"
+                >
+                  <Star className="h-3 w-3" />
+                </button>
               )}
             </div>
           ))}

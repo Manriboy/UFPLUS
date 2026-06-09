@@ -11,7 +11,7 @@ const ROLE_ALLOWED: Record<string, string[]> = {
 // A dónde redirigir si el rol intenta acceder a algo no permitido
 const ROLE_HOME: Record<string, string> = {
   PROPIETARIO: '/admin/mis-publicaciones',
-  BROKER:      '/admin/mis-publicaciones',
+  BROKER:      '/admin/stock-usados',
 }
 
 export async function middleware(request: NextRequest) {
@@ -55,5 +55,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin', '/admin/:path*'],
 }

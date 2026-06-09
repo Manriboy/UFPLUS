@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Plus, Building2, Home } from 'lucide-react'
 import ProjectsTable from '@/components/admin/ProjectsTable'
 import UsadosTable from '@/components/admin/UsadosTable'
+import IndicadoresWidget from '@/components/admin/IndicadoresWidget'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Proyectos — Admin UFPlus' }
@@ -12,8 +13,8 @@ interface Props {
   searchParams: { filter?: string; search?: string; categoria?: string }
 }
 
-export default function AdminProjectsPage({ searchParams }: Props) {
-  const categoria = searchParams.categoria === 'usados' ? 'usados' : 'nuevos'
+export default async function AdminProjectsPage({ searchParams }: Props) {
+  const categoria = searchParams.categoria === 'nuevos' ? 'nuevos' : 'usados'
   const filter = searchParams.filter || 'all'
   const search = searchParams.search || ''
 
@@ -25,7 +26,7 @@ export default function AdminProjectsPage({ searchParams }: Props) {
     { key: 'archived', label: 'Archivados' },
   ]
 
-  const baseHref = categoria === 'usados' ? '/admin/proyectos?categoria=usados' : '/admin/proyectos'
+  const baseHref = categoria === 'nuevos' ? '/admin/proyectos?categoria=nuevos' : '/admin/proyectos'
   const filterHref = (key: string) =>
     `${baseHref}${key !== 'all' ? `${baseHref.includes('?') ? '&' : '?'}filter=${key}` : ''}`
 
@@ -33,35 +34,27 @@ export default function AdminProjectsPage({ searchParams }: Props) {
     <div className="max-w-7xl mx-auto space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-brand-text">Proyectos</h1>
           <p className="text-sm text-gray-500 mt-1">Gestión completa del portafolio</p>
         </div>
-        <Link
-          href="/admin/proyectos/nuevo"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dark transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo proyecto
-        </Link>
+        <div className="flex items-center gap-5">
+          <IndicadoresWidget />
+          <Link
+            href="/admin/proyectos/nuevo"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dark transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo proyecto
+          </Link>
+        </div>
       </div>
 
       {/* Toggle Nuevos / Usados */}
       <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         <Link
           href="/admin/proyectos"
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            categoria === 'nuevos'
-              ? 'bg-white text-brand-text shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <Building2 className="h-4 w-4" />
-          Nuevos
-        </Link>
-        <Link
-          href="/admin/proyectos?categoria=usados"
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             categoria === 'usados'
               ? 'bg-white text-brand-text shadow-sm'
@@ -70,6 +63,17 @@ export default function AdminProjectsPage({ searchParams }: Props) {
         >
           <Home className="h-4 w-4" />
           Usados
+        </Link>
+        <Link
+          href="/admin/proyectos?categoria=nuevos"
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            categoria === 'nuevos'
+              ? 'bg-white text-brand-text shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Building2 className="h-4 w-4" />
+          Nuevos
         </Link>
       </div>
 

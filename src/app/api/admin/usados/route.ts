@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true, region: true, commune: true, bedrooms: true, bathrooms: true,
       parkingSpots: true, storageRooms: true, sqmTotal: true, sqmTerrace: true,
-      price: true, status: true, isFeatured: true, isArchived: true, createdAt: true,
+      price: true, currency: true, status: true, isFeatured: true, isArchived: true, createdAt: true,
     },
   })
 

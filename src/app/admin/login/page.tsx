@@ -2,7 +2,7 @@
 'use client'
 import { useState } from 'react'
 import Image from 'next/image'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -35,7 +35,13 @@ export default function LoginPage() {
     if (result?.error) {
       setError('Email o contraseña incorrectos.')
     } else {
-      window.location.href = '/admin'
+      const session = await getSession()
+      const role = (session?.user as any)?.role as string
+      const ROLE_REDIRECTS: Record<string, string> = {
+        BROKER:      '/admin/stock-usados',
+        PROPIETARIO: '/admin/mis-publicaciones',
+      }
+      window.location.href = ROLE_REDIRECTS[role] ?? '/admin'
     }
   }
 

@@ -1053,14 +1053,6 @@ export default function ExternalStockSearch() {
   return (
     <div className="p-6 space-y-6">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Stock Unificado</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Busca proyectos en el stock sincronizado de todas las fuentes
-        </p>
-      </div>
-
       {/* Switches de fuente */}
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fuentes:</span>

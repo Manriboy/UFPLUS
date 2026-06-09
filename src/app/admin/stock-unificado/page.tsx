@@ -1,12 +1,20 @@
 // src/app/admin/stock-unificado/page.tsx
 import SyncPanel from '@/components/admin/SyncPanel'
 import ExternalStockSearch from '@/components/admin/ExternalStockSearch'
+import IndicadoresWidget from '@/components/admin/IndicadoresWidget'
 
 export const metadata = { title: 'Stock Unificado' }
 
-export default function StockUnificadoPage() {
+export default async function StockUnificadoPage() {
   return (
     <>
+      <div className="px-6 pt-6 pb-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-brand-text">Stock UFPLUS</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Búsqueda unificada de inventario externo</p>
+        </div>
+        <IndicadoresWidget />
+      </div>
       <ExternalStockSearch />
       <div className="px-6 pb-6">
         <SyncPanel />

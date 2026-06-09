@@ -9,7 +9,9 @@ import {
   Search,
   Loader2,
   ExternalLink,
+  Trash2,
 } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { toast } from '@/components/ui/Toast'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { formatPrice, DELIVERY_TYPE_LABELS } from '@/lib/utils'
@@ -35,12 +37,17 @@ interface Props {
 }
 
 export default function ProjectsTable({ initialFilter, initialSearch }: Props) {
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user?.role as string) === 'SUPERADMIN'
+
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(initialSearch)
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [archiveTarget, setArchiveTarget] = useState<Project | null>(null)
   const [archiving, setArchiving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const fetchProjects = useCallback(async () => {
@@ -101,6 +108,22 @@ export default function ProjectsTable({ initialFilter, initialSearch }: Props) {
       toast('Error al archivar proyecto', 'error')
     } finally {
       setArchiving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/projects/${deleteTarget.id}/delete`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      toast('Proyecto eliminado permanentemente', 'success')
+      setDeleteTarget(null)
+    } catch {
+      toast('Error al eliminar proyecto', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -275,6 +298,15 @@ export default function ProjectsTable({ initialFilter, initialSearch }: Props) {
                               <Archive className="h-4 w-4" />
                             </button>
                           )}
+                          {project.isArchived && isSuperAdmin && (
+                            <button
+                              onClick={() => setDeleteTarget(project)}
+                              title="Eliminar permanentemente"
+                              className="p-1.5 text-gray-400 hover:text-red-700 hover:bg-red-100 rounded transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -295,6 +327,18 @@ export default function ProjectsTable({ initialFilter, initialSearch }: Props) {
         title="Archivar proyecto"
         description={`¿Estás seguro de archivar "${archiveTarget?.name}"? El proyecto se desactivará y no será visible en el sitio. Puedes restaurarlo más adelante.`}
         confirmLabel="Archivar proyecto"
+        cancelLabel="Cancelar"
+      />
+
+      {/* Delete Confirm (SUPERADMIN only) */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Eliminar proyecto permanentemente"
+        description={`¿Estás seguro de eliminar definitivamente "${deleteTarget?.name}"? Esta acción es irreversible y eliminará todos los datos asociados.`}
+        confirmLabel="Eliminar permanentemente"
         cancelLabel="Cancelar"
       />
     </div>
