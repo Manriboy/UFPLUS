@@ -40,6 +40,25 @@ function broukHeaders(token: string, referer: string) {
 }
 const BROUK_BODY = JSON.stringify({ options: { timeZone: 'America/Santiago', userLocale: 'en-US' }, pageContext: null, filterCriteria: {} })
 
+async function broukFetch(url: string, init: RequestInit, retries = 3): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 30_000)
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal })
+      clearTimeout(timer)
+      if (res.status === 401 || res.status === 403) throw new Error('Token expirado · 401')
+      return res
+    } catch (e) {
+      clearTimeout(timer)
+      if (e instanceof Error && e.message.includes('Token expirado')) throw e
+      if (attempt === retries - 1) throw e
+      await new Promise(r => setTimeout(r, 1_000 * (attempt + 1)))
+    }
+  }
+  throw new Error('Max retries alcanzado')
+}
+
 async function geocodeAddress(address: string, commune: string | null): Promise<{ lat: number; lng: number } | null> {
   try {
     const HERE_KEY = process.env.NEXT_PUBLIC_HERE_API_KEY
@@ -64,12 +83,11 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
   const token = dbSetting?.value || process.env.BROUK_JWT_TOKEN
   if (!token) throw new Error('Token no configurado')
 
-  const listRes = await fetch(LIST_URL, {
+  const listRes = await broukFetch(LIST_URL, {
     method: 'POST',
     headers: broukHeaders(token, 'https://www.brouk.cl/showroom'),
     body: JSON.stringify({ options: { timeZone: 'America/Santiago', userLocale: 'en-US' }, pageContext: null, filterCriteria: {}, pagingOption: { offset: null, count: 100 } }),
   })
-  if (listRes.status === 401 || listRes.status === 403) throw new Error('Token expirado · 401')
   if (!listRes.ok) throw new Error(`Error de conexión ${listRes.status}`)
 
   const listData = await listRes.json() as BroukListResponse
@@ -94,8 +112,8 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
     for (const item of chunk) {
       const referer = `https://www.brouk.cl/proyectosbrouk?recordId=${item.id}`
       const [detRes, condRes] = await Promise.all([
-        fetch(`${DETAIL_BASE}/${item.id}`, { method: 'POST', headers: broukHeaders(token, referer), body: BROUK_BODY }),
-        fetch(`${COND_BASE}/${item.id}`, { method: 'POST', headers: broukHeaders(token, referer), body: BROUK_BODY }),
+        broukFetch(`${DETAIL_BASE}/${item.id}`, { method: 'POST', headers: broukHeaders(token, referer), body: BROUK_BODY }),
+        broukFetch(`${COND_BASE}/${item.id}`, { method: 'POST', headers: broukHeaders(token, referer), body: BROUK_BODY }),
       ])
 
       const detRaw = detRes.ok ? await detRes.json().catch(() => null) : null

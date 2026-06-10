@@ -6,10 +6,10 @@ const STATS = [
   { target: 150, label: 'Proyectos analizados' },
   { target: 40,  label: 'Inmobiliarias' },
   { target: 30,  label: 'Comunas en todo el país' },
-  { target: 150, label: 'Clientes satisfechos' },
+  { target: 100, label: 'Clientes satisfechos' },
 ]
 
-const DURATION = 5000
+const DURATION = 10000
 
 function CountUp({ target, active }: { target: number; active: boolean }) {
   const [count, setCount] = useState(0)

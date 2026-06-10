@@ -11,15 +11,18 @@ export async function refreshIrisToken(): Promise<string | null> {
   if (!username || !password || !clientId) return null
 
   try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 15_000)
     const res = await fetch(IRIS_LOGIN_URL, {
       method: 'POST',
+      signal: ctrl.signal,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Origin': 'https://iris.yapo.cl',
         'Referer': 'https://iris.yapo.cl/',
       },
       body: new URLSearchParams({ username, password, client_id: clientId }).toString(),
-    })
+    }).finally(() => clearTimeout(timer))
 
     if (!res.ok) return null
 

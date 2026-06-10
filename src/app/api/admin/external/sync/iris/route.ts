@@ -176,26 +176,43 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
 
     const units = p.units ?? []
 
-    // Upserts de unidades en paralelo
-    await Promise.all(units.map(u =>
-      withRetry(() => prisma.externalUnit.upsert({
-        where: { source_sourceId: { source: 'iris', sourceId: String(u.id) } },
-        create: {
-          projectId, source: 'iris', sourceId: String(u.id),
-          number: u.number ?? null, model: u.tipology ?? null,
-          bedrooms: u.bedrooms ?? null, bathrooms: u.bathrooms ?? null,
-          m2Interior: u.m2 > 0 ? u.m2 : null, m2Terrace: u.m2_outdoor > 0 ? u.m2_outdoor : null,
-          floor: u.floor ?? null, facing: u.orientation ?? null,
-          price: u.price > 0 ? u.price : null, finalPrice: u.final_price > 0 ? u.final_price : null,
-          discountPct: toFloat(u.max_discount), bonoPie: toFloat(u.bonus_pie),
-          planUrl: u.plan || null, available: true, rawData: u as object,
-        },
-        update: {
-          available: true, price: u.price > 0 ? u.price : null, finalPrice: u.final_price > 0 ? u.final_price : null,
-          discountPct: toFloat(u.max_discount), bonoPie: toFloat(u.bonus_pie),
-        },
+    // Batch upsert en una sola query SQL — evita saturar el connection pool
+    // con Promise.all(N upserts) que en producción causa timeout a los 10s.
+    if (units.length > 0) {
+      const rows = units.map(u => ({
+        sourceId: String(u.id),
+        number: u.number ?? null, model: u.tipology ?? null,
+        bedrooms: u.bedrooms ?? null, bathrooms: u.bathrooms ?? null,
+        m2Interior: u.m2 > 0 ? u.m2 : null, m2Terrace: u.m2_outdoor > 0 ? u.m2_outdoor : null,
+        floor: u.floor ?? null, facing: u.orientation ?? null,
+        price: u.price > 0 ? u.price : null, finalPrice: u.final_price > 0 ? u.final_price : null,
+        discountPct: toFloat(u.max_discount), bonoPie: toFloat(u.bonus_pie),
+        planUrl: u.plan || null, rawData: u,
       }))
-    ))
+      await prisma.$executeRaw`
+        INSERT INTO "ExternalUnit"
+          (id, source, "sourceId", "projectId", number, model, bedrooms, bathrooms,
+           "m2Interior", "m2Terrace", floor, facing, price, "finalPrice",
+           "discountPct", "bonoPie", "planUrl", available, "rawData", "syncedAt")
+        SELECT
+          gen_random_uuid()::text, 'iris', x->>'sourceId', ${projectId},
+          x->>'number', x->>'model',
+          (x->>'bedrooms')::int, (x->>'bathrooms')::int,
+          (x->>'m2Interior')::float, (x->>'m2Terrace')::float,
+          x->>'floor', x->>'facing',
+          (x->>'price')::float, (x->>'finalPrice')::float,
+          (x->>'discountPct')::float, (x->>'bonoPie')::float,
+          x->>'planUrl', true, x->'rawData', NOW()
+        FROM jsonb_array_elements(${JSON.stringify(rows)}::jsonb) AS x
+        ON CONFLICT (source, "sourceId") DO UPDATE SET
+          available     = true,
+          price         = EXCLUDED.price,
+          "finalPrice"  = EXCLUDED."finalPrice",
+          "discountPct" = EXCLUDED."discountPct",
+          "bonoPie"     = EXCLUDED."bonoPie",
+          "syncedAt"    = NOW()
+      `
+    }
     unitsSynced += units.length
 
     // Actualizar tipologías y precio mínimo del proyecto
