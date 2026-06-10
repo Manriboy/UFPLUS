@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { refreshIrisToken } from '@/lib/iris-token'
-import { assignAndMergeCanonical } from '@/lib/canonical-merge'
+import { assignAndMergeCanonical, fixDuplicateSourceMerges } from '@/lib/canonical-merge'
 
 const IRIS_SEARCH_URL = 'https://iris-auth.infocasas.com.uy/api/projects/get-projects-search'
 const PAGE_SIZE = 18
@@ -69,9 +69,22 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 800): Pro
   throw new Error('Max retries')
 }
 
+// ── Helper paralelo en chunks ────────────────────────────
+
+async function inChunks<T>(items: T[], fn: (item: T) => Promise<void>, size = 10): Promise<void> {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(fn))
+  }
+}
+
 // ── Lógica principal de sync ─────────────────────────────
 
 async function runSync(send: (pct: number, msg: string) => void): Promise<SyncResult> {
+  // Corregir fusiones incorrectas de proyectos de la misma fuente antes de sincronizar
+  send(1, 'Verificando fusiones de proyectos...')
+  const fixed = await fixDuplicateSourceMerges()
+  if (fixed > 0) send(2, `${fixed} proyectos separados correctamente`)
+
   send(2, 'Conectando con la fuente...')
 
   let token = await getToken()
@@ -96,18 +109,18 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
   const totalPages = Math.ceil((firstData.total ?? 0) / PAGE_SIZE)
   send(8, `${firstData.total} proyectos · ${totalPages} páginas`)
 
-  // Páginas restantes: 8% → 20%
-  const remaining: IrisProject[][] = []
-  for (let i = 2; i <= totalPages; i++) {
-    const d = await fetchPage(i, token!).then(r => r.json() as Promise<IrisSearchResponse>).then(d => d.data ?? []).catch(() => [] as IrisProject[])
-    remaining.push(d)
-    const pct = 8 + Math.round(((i - 1) / Math.max(totalPages - 1, 1)) * 12)
-    send(pct, `Página ${i}/${totalPages}...`)
-  }
+  // Páginas restantes en PARALELO
+  const remainingPages = totalPages > 1
+    ? await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          fetchPage(i + 2, token!).then(r => r.json() as Promise<IrisSearchResponse>).then(d => d.data ?? []).catch(() => [] as IrisProject[])
+        )
+      )
+    : []
 
-  const allProjects: IrisProject[] = [...(firstData.data ?? []), ...remaining.flat()]
+  const allProjects: IrisProject[] = [...(firstData.data ?? []), ...remainingPages.flat()]
+  send(20, `${allProjects.length} proyectos. Comparando con BD...`)
 
-  send(20, 'Comparando con base de datos...')
   const existing = await prisma.externalProject.findMany({ where: { source: 'iris' }, select: { sourceId: true } })
   const existingIds = new Set(existing.map(e => e.sourceId))
   const currentIds = new Set(allProjects.map(p => String(p.id)))
@@ -117,10 +130,11 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
   }
 
   let newProjectsCount = 0
+  const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? '')); return isNaN(n) ? null : n }
 
-  // Upsert proyectos secuencial: 22% → 40%
-  for (let i = 0; i < allProjects.length; i++) {
-    const p = allProjects[i]
+  // Upsert proyectos en chunks paralelos de 10: 22% → 40%
+  send(22, 'Guardando proyectos...')
+  await inChunks(allProjects, async (p) => {
     const sourceId = String(p.id)
     const isNew = !existingIds.has(sourceId)
     const lat = p.latitude ? parseFloat(String(p.latitude)) : null
@@ -135,37 +149,39 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
     await withRetry(() => prisma.externalProject.upsert({
       where: { source_sourceId: { source: 'iris', sourceId } },
       create: { source: 'iris', sourceId, ...base, typologies: [], rawData: p as object },
-      // hereLat/hereLng no se incluyen en update — son autoritativos y solo los escribe el script de geocodificación HERE
+      // hereLat/hereLng no se incluyen en update — autoritativos para geocodificación HERE
       update: { ...base, rawData: p as object },
     }))
     if (isNew) newProjectsCount++
-    if (i % 5 === 0 || i === allProjects.length - 1) {
-      const pct = 22 + Math.round(((i + 1) / allProjects.length) * 18)
-      send(pct, `Proyectos (${i + 1}/${allProjects.length})...`)
-    }
-  }
+  }, 10)
+  send(40, 'Proyectos guardados. Sincronizando unidades...')
 
-  // Unidades secuencial: 40% → 95%
+  // Marcar TODAS las unidades IRIS como no disponibles en UNA sola query
+  await prisma.$executeRaw`UPDATE "ExternalUnit" SET available = false WHERE source = 'iris'`
+
+  // Obtener todos los IDs de proyecto en UNA sola query
+  const projectRows = await prisma.externalProject.findMany({
+    where: { source: 'iris' },
+    select: { id: true, sourceId: true },
+  })
+  const projectIdMap = new Map(projectRows.map(r => [r.sourceId, r.id]))
+
+  // Upsert unidades en chunks paralelos de 8 proyectos a la vez: 40% → 95%
   let unitsSynced = 0
-  const toFloat = (v: unknown) => { const n = parseFloat(String(v ?? '')); return isNaN(n) ? null : n }
+  let processed = 0
 
-  for (let i = 0; i < allProjects.length; i++) {
-    const p = allProjects[i]
-    const project = await withRetry(() => prisma.externalProject.findUnique({
-      where: { source_sourceId: { source: 'iris', sourceId: String(p.id) } }, select: { id: true },
-    }))
-    if (!project) continue
+  await inChunks(allProjects, async (p) => {
+    const projectId = projectIdMap.get(String(p.id))
+    if (!projectId) return
 
-    await withRetry(() => prisma.$executeRaw`
-      UPDATE "ExternalUnit" SET available = false
-      WHERE "projectId" = ${project.id} AND source = 'iris'
-    `)
+    const units = p.units ?? []
 
-    for (const u of p.units ?? []) {
-      await withRetry(() => prisma.externalUnit.upsert({
+    // Upserts de unidades en paralelo
+    await Promise.all(units.map(u =>
+      withRetry(() => prisma.externalUnit.upsert({
         where: { source_sourceId: { source: 'iris', sourceId: String(u.id) } },
         create: {
-          projectId: project.id, source: 'iris', sourceId: String(u.id),
+          projectId, source: 'iris', sourceId: String(u.id),
           number: u.number ?? null, model: u.tipology ?? null,
           bedrooms: u.bedrooms ?? null, bathrooms: u.bathrooms ?? null,
           m2Interior: u.m2 > 0 ? u.m2 : null, m2Terrace: u.m2_outdoor > 0 ? u.m2_outdoor : null,
@@ -179,13 +195,14 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
           discountPct: toFloat(u.max_discount), bonoPie: toFloat(u.bonus_pie),
         },
       }))
-      unitsSynced++
-    }
+    ))
+    unitsSynced += units.length
 
-    const av = await withRetry(() => prisma.externalUnit.findMany({
-      where: { projectId: project.id, available: true },
+    // Actualizar tipologías y precio mínimo del proyecto
+    const av = await prisma.externalUnit.findMany({
+      where: { projectId, available: true },
       select: { model: true, bedrooms: true, bathrooms: true, finalPrice: true },
-    }))
+    })
     const typologies = Array.from(new Set(av.map(u => {
       if (u.bedrooms === 0) return 'Estudio'
       if (u.bedrooms !== null && u.bathrooms !== null) return `${u.bedrooms}D${u.bathrooms}B`
@@ -193,16 +210,15 @@ async function runSync(send: (pct: number, msg: string) => void): Promise<SyncRe
     }).filter(Boolean))) as string[]
     const prices = av.map(u => u.finalPrice).filter((v): v is number => v !== null && v > 0)
     const priceFrom = prices.length > 0 ? Math.min(...prices) : null
-    await withRetry(() => prisma.externalProject.update({
-      where: { id: project.id }, data: { typologies, ...(priceFrom !== null && { priceFrom }) },
-    }))
-    await assignAndMergeCanonical(project.id)
+    await prisma.externalProject.update({
+      where: { id: projectId }, data: { typologies, ...(priceFrom !== null && { priceFrom }) },
+    })
+    await assignAndMergeCanonical(projectId)
 
-    if (i % 3 === 0 || i === allProjects.length - 1) {
-      const pct = 40 + Math.round(((i + 1) / allProjects.length) * 55)
-      send(pct, `Unidades (${i + 1}/${allProjects.length} proyectos)...`)
-    }
-  }
+    processed++
+    const pct = 40 + Math.round((processed / allProjects.length) * 55)
+    send(Math.min(pct, 95), `Unidades (${processed}/${allProjects.length} proyectos)...`)
+  }, 8)
 
   return { totalProjects: allProjects.length, newProjects: newProjectsCount, staleRemoved: staleIds.length, unitsSynced }
 }

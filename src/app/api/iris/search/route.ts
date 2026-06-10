@@ -52,6 +52,8 @@ type MappedProject = {
   images: string[]; brochure: string | null
   zone: { id: number; name: string } | null
   department: string | null; status: string | null
+  lat: number | null; lng: number | null
+  hereLat: number | null; hereLng: number | null
   units: MappedUnit[]
 }
 
@@ -182,6 +184,7 @@ function mapIrisProject(p: IrisRawProject): MappedProject {
     zone: p.zone ? { id: p.zone.id, name: p.zone.name } : null,
     department: p.department?.name ?? null,
     status: p.status?.name ?? null,
+    lat: null, lng: null, hereLat: null, hereLng: null,
     // commission omitida intencionalmente — no se expone al cliente
     units: (p.units ?? []).map((u) => ({
       id: u.id,
@@ -270,6 +273,7 @@ function mapUFPlusProject(p: UFPlusProject): MappedProject {
     zone: p.commune ? { id: 0, name: p.commune } : null,
     department: p.region ?? null,
     status: deliveryTypeToStatus(p.deliveryType),
+    lat: null, lng: null, hereLat: null, hereLng: null,
     units: unitsMapped,
   }
 }
@@ -444,6 +448,16 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ── 3b. Coordenadas IRIS desde ExternalProject ────────
+  const irisSourceIds = filteredIris.map(p => String(p.id))
+  const irisCoords = irisSourceIds.length > 0
+    ? await prisma.externalProject.findMany({
+        where: { source: 'iris', sourceId: { in: irisSourceIds } },
+        select: { sourceId: true, lat: true, lng: true, hereLat: true, hereLng: true },
+      })
+    : []
+  const coordsMap = new Map(irisCoords.map(c => [c.sourceId, c]))
+
   // ── 4. Deduplicar: si UFPlus y Iris comparten dirección O nombre, gana Iris ──
 
   const normalizeTitle = (t: string) => t.toLowerCase().trim().replace(/\s+/g, ' ')
@@ -464,7 +478,10 @@ export async function POST(req: NextRequest) {
   // ── 5. Unificar: Iris primero, UFPlus al final ────────
 
   const combined: MappedProject[] = [
-    ...filteredIris.map(mapIrisProject),
+    ...filteredIris.map(p => {
+      const c = coordsMap.get(String(p.id))
+      return { ...mapIrisProject(p), lat: c?.lat ?? null, lng: c?.lng ?? null, hereLat: c?.hereLat ?? null, hereLng: c?.hereLng ?? null }
+    }),
     ...dedupedUFPlus.map(mapUFPlusProject),
   ]
 

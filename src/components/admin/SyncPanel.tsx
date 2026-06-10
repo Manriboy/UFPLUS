@@ -12,8 +12,8 @@ const INITIAL: SyncState = { status: 'idle', progress: 0, message: '' }
 // ── Definición de fuentes por sección ────────────────────
 
 const DAILY_SOURCES = [
-  { key: 'iris-daily',  label: 'AWS',   description: 'Renueva token + precios',   url: '/api/admin/external/sync/iris/daily' },
-  { key: 'brouk-daily', label: 'Drive', description: 'Renueva links de imágenes', url: '/api/admin/external/sync/brouk' },
+  { key: 'iris-daily',  label: 'AWS',   description: 'Token + unidades y precios', url: '/api/admin/external/sync/iris/daily' },
+  { key: 'brouk-daily', label: 'Drive', description: 'Renueva links de imágenes',  url: '/api/admin/external/sync/brouk' },
 ] as const
 
 const WEEKLY_SOURCES = [

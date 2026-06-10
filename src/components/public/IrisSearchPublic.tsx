@@ -2,12 +2,15 @@
 // src/components/public/IrisSearchPublic.tsx
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import {
   Search, RefreshCw, MapPin, Calendar, ChevronDown,
-  Home, AlertCircle, FileText, X, KeyRound,
+  Home, AlertCircle, FileText, X, KeyRound, Map,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IRIS_REGIONS } from '@/lib/iris-zones'
+
+const ProjectMap = dynamic(() => import('@/components/admin/ProjectMap'), { ssr: false })
 
 // ─── Tipos ───────────────────────────────────────────
 
@@ -45,6 +48,10 @@ interface IrisProject {
   zone: { id: number; name: string } | null
   department: string | null
   status: string | null
+  lat: number | null
+  lng: number | null
+  hereLat: number | null
+  hereLng: number | null
   units: IrisUnit[]
 }
 
@@ -461,6 +468,8 @@ export default function IrisSearchPublic() {
   const [tokenExpired, setTokenExpired] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [showMap, setShowMap] = useState(true)
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(null)
 
   // Grid responsivo: detectar número de columnas activo
   const gridRef = useRef<HTMLDivElement>(null)
@@ -489,6 +498,16 @@ export default function IrisSearchPublic() {
   const selectedRegion = IRIS_REGIONS.find((r) => r.id === regionId)
   const canSearch = regionId !== ''
   const expandedProject = projects.find((p) => String(p.id) === expandedId) ?? null
+
+  const mapProjects = useMemo(
+    () => projects.filter(p => (p.hereLat ?? p.lat) !== null && (p.hereLng ?? p.lng) !== null),
+    [projects]
+  )
+
+  const visibleCards = useMemo(
+    () => selectedMapId ? projects.filter(p => String(p.id) === selectedMapId) : projects,
+    [projects, selectedMapId]
+  )
 
   // Índice del grid tras el cual insertar el panel (último de la misma fila)
   const panelInsertAfter = useMemo(() => {
@@ -524,6 +543,7 @@ export default function IrisSearchPublic() {
     setSearched(false)
     setTotal(0)
     setExpandedId(null)
+    setSelectedMapId(null)
     setError('')
   }
 
@@ -533,6 +553,7 @@ export default function IrisSearchPublic() {
     setError('')
     setTokenExpired(false)
     setExpandedId(null)
+    setSelectedMapId(null)
     try {
       const res = await fetch('/api/iris/search', {
         method: 'POST',
@@ -748,17 +769,58 @@ export default function IrisSearchPublic() {
       {/* Resultados */}
       {searched && !error && (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <p className="text-sm text-gray-500">
               {projects.length === 0
                 ? 'Sin proyectos con los filtros aplicados'
-                : `${total} proyectos encontrados`}
+                : selectedMapId
+                  ? `1 seleccionado · ${total} encontrados`
+                  : `${total} proyectos encontrados`}
             </p>
+
+            {projects.length > 0 && mapProjects.length > 0 && (
+              <div className="flex items-center gap-2">
+                {selectedMapId && (
+                  <button onClick={() => setSelectedMapId(null)} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+                    <X className="h-3 w-3" /> Ver todos
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowMap(v => !v)}
+                  className={cn(
+                    'flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors',
+                    showMap
+                      ? 'bg-brand-primary text-white border-brand-primary'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-brand-primary hover:text-brand-primary'
+                  )}
+                >
+                  <Map className="h-3.5 w-3.5" />
+                  {showMap ? 'Ocultar mapa' : 'Ver mapa'}
+                </button>
+              </div>
+            )}
           </div>
 
-          {projects.length > 0 && (
+          {/* Mapa */}
+          {showMap && mapProjects.length > 0 && (
+            <ProjectMap
+              projects={mapProjects.map(p => ({
+                id: String(p.id),
+                title: p.title,
+                lat: p.hereLat ?? p.lat ?? 0,
+                lng: p.hereLng ?? p.lng ?? 0,
+                hereLat: p.hereLat,
+                hereLng: p.hereLng,
+                source: p.source,
+              }))}
+              selectedId={selectedMapId}
+              onSelect={id => setSelectedMapId(id)}
+            />
+          )}
+
+          {visibleCards.length > 0 && (
             <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projects.flatMap((p, i) => {
+              {visibleCards.flatMap((p, i) => {
                 const card = (
                   <ProjectCard
                     key={p.id}

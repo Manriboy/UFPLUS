@@ -27,14 +27,28 @@ export async function POST(req: NextRequest) {
     ? filter.sources
     : ['iris', 'jetbrokers', 'brouk']
 
-  // Base: proyectos con unidades de alguna fuente activa
-  const where: Prisma.CanonicalProjectWhereInput = {
-    externalProjects: {
-      some: {
-        source: { in: activeSources },
-        units: { some: { available: true } },
+  // Brouk no tiene ExternalUnit — solo exige que el proyecto exista.
+  // Iris y JetBrokers sí tienen unidades individuales → requieren units disponibles.
+  const unitTrackedSources = activeSources.filter(s => s !== 'brouk')
+  const broukActive = activeSources.includes('brouk')
+
+  const sourceConditions: Prisma.CanonicalProjectWhereInput[] = []
+  if (unitTrackedSources.length > 0) {
+    sourceConditions.push({
+      externalProjects: {
+        some: { source: { in: unitTrackedSources }, units: { some: { available: true } } },
       },
-    },
+    })
+  }
+  if (broukActive) {
+    sourceConditions.push({
+      externalProjects: { some: { source: 'brouk' } },
+    })
+  }
+
+  // Base: proyectos que cumplan al menos una condición de fuente activa
+  const where: Prisma.CanonicalProjectWhereInput = {
+    OR: sourceConditions,
   }
 
   if (filter.q?.trim()) {
@@ -84,11 +98,7 @@ export async function POST(req: NextRequest) {
       },
     }),
     prisma.canonicalProject.findMany({
-      where: {
-        externalProjects: {
-          some: { source: { in: activeSources }, units: { some: { available: true } } },
-        },
-      },
+      where: { OR: sourceConditions },
       select: { commune: true, stage: true },
     }),
   ])

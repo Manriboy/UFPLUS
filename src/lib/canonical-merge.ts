@@ -78,10 +78,13 @@ export async function assignAndMergeCanonical(projectId: string): Promise<void> 
   if (!canonicalId) {
     if (project.lat !== null && project.lng !== null) {
       // Bounding box pre-filter: ±0.001° lat ≈ ±111 m, ±0.0015° lng ≈ ±111 m at Santiago
+      // Solo fusionar con canónicos que NO tengan ya un proyecto de la misma fuente:
+      // evita mezclar Edificio A y Edificio B (ambos IRIS) en un solo canónico.
       const nearby = await prisma.canonicalProject.findMany({
         where: {
           lat: { gte: project.lat - 0.001, lte: project.lat + 0.001 },
           lng: { gte: project.lng - 0.0015, lte: project.lng + 0.0015 },
+          externalProjects: { none: { source: project.source } },
         },
         select: { id: true, lat: true, lng: true },
       })
@@ -106,4 +109,41 @@ export async function assignAndMergeCanonical(projectId: string): Promise<void> 
   const siblings = await prisma.externalProject.findMany({ where: { canonicalId } })
   const merged = mergeCanonical(siblings)
   await prisma.canonicalProject.update({ where: { id: canonicalId }, data: merged })
+}
+
+/**
+ * Separa canónicos que tienen más de un ExternalProject de la misma fuente
+ * (consecuencia de la fusión incorrecta por proximidad).
+ * Para cada duplicado, crea un nuevo canónico propio.
+ * Debe llamarse una sola vez para limpiar datos históricos.
+ */
+export async function fixDuplicateSourceMerges(): Promise<number> {
+  // Encontrar external projects que comparten fuente+canonical con otro
+  const dupes = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT ep.id
+    FROM "ExternalProject" ep
+    WHERE ep."canonicalId" IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM "ExternalProject" ep2
+        WHERE ep2."canonicalId" = ep."canonicalId"
+          AND ep2.source = ep.source
+          AND ep2.id < ep.id
+      )
+  `
+
+  if (dupes.length === 0) return 0
+
+  // Desligar los duplicados de su canónico actual
+  const dupeIds = dupes.map(d => d.id)
+  await prisma.externalProject.updateMany({
+    where: { id: { in: dupeIds } },
+    data: { canonicalId: null },
+  })
+
+  // Crear un nuevo canónico propio para cada uno
+  for (const { id } of dupes) {
+    await assignAndMergeCanonical(id)
+  }
+
+  return dupes.length
 }
