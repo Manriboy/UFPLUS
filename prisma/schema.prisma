@@ -18,15 +18,27 @@ model User {
   emailVerified DateTime?
   password      String?
   role          Role      @default(ADMIN)
-  brokerType    String?
-  companyName   String?
-  phone         String?
-  image         String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  brokerType     String?
+  companyName    String?
+  phone          String?
+  plainPassword  String?   // Solo visible para superadmin; null si el usuario cambió su propia contraseña
+  image          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   accounts       Account[]
   sessions       Session[]
   usedProperties UsedProperty[]
+  resetTokens    PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 model UsedProperty {
