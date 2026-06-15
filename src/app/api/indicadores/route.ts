@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getIndicadores } from '@/lib/indicadores'
 
-export const revalidate = 86400
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const data = await getIndicadores()
