@@ -74,6 +74,17 @@ type JBUnit = {
   hasStorage: boolean
 }
 
+type SecondaryUnit = {
+  id: string
+  number: string
+  type: 'garage' | 'warehouse'
+  price: number | null
+  location: string | null
+  description: string | null
+  accessible?: boolean
+  priceReference?: boolean
+}
+
 // ─── Constantes ───────────────────────────────────────
 
 const PRICE_MAX = 20000
@@ -511,9 +522,10 @@ function SkeletonRow() {
 
 type SortField = 'number' | 'typology' | 'rooms' | 'surfaceInterior' | 'surfaceTerrace' | 'facing' | 'price' | 'discountRate' | 'finalPrice'
 
-function UnitsModal({ project, units, loading, error, onClose }: {
+function UnitsModal({ project, units, secondaryUnits, loading, error, onClose }: {
   project: CanonicalProject
   units: JBUnit[]
+  secondaryUnits: SecondaryUnit[]
   loading: boolean
   error: string | null
   onClose: () => void
@@ -521,10 +533,17 @@ function UnitsModal({ project, units, loading, error, onClose }: {
   const stageLabel = project.stage ? (STAGE_LABELS[project.stage] ?? project.stage) : null
   const stageColor = project.stage ? (STAGE_COLORS[project.stage] ?? 'bg-gray-100 text-gray-700') : null
 
+  // Switch Principales / Secundarios
+  const [tab, setTab] = useState<'main' | 'secondary'>('main')
+
+  // Principales
   const uniqueTypologies = Array.from(new Set(units.map(u => u.typology))).sort()
   const [activeTypology, setActiveTypology] = useState<string>('all')
   const [sortField, setSortField] = useState<SortField>('finalPrice')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  // Secundarios
+  const [secFilter, setSecFilter] = useState<'all' | 'garage' | 'warehouse'>('all')
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -537,6 +556,10 @@ function UnitsModal({ project, units, loading, error, onClose }: {
     const d = effectiveDiscount(u)
     return d > 0 ? u.price * (1 - d / 100) : u.finalPrice
   }
+
+  const filteredSecondary = secondaryUnits.filter(u =>
+    secFilter === 'all' || u.type === (secFilter === 'garage' ? 'garage' : 'warehouse')
+  )
 
   const baseFiltered = activeTypology === 'all' ? units : units.filter(u => u.typology === activeTypology)
   const filtered = [...baseFiltered].sort((a, b) => {
@@ -621,33 +644,58 @@ function UnitsModal({ project, units, loading, error, onClose }: {
               </p>
             </div>
           )}
-          {!loading && (
-            <div className="ml-auto">
-              <span className="text-xs text-gray-500">{units.length} unidades disponibles</span>
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-3">
+            {!loading && (
+              <span className="text-xs text-gray-500">
+                {tab === 'main' ? `${units.length} unidades disponibles` : `${secondaryUnits.filter(u => u.type === 'garage').length} estacionamientos`}
+              </span>
+            )}
+            {/* Switch Principales / Secundarios */}
+            {!loading && secondaryUnits.length > 0 && (
+              <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setTab('main')}
+                  className={cn('px-3 py-1.5 rounded-md text-xs font-semibold transition-all', tab === 'main' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}
+                >Principales</button>
+                <button
+                  type="button"
+                  onClick={() => setTab('secondary')}
+                  className={cn('px-3 py-1.5 rounded-md text-xs font-semibold transition-all', tab === 'secondary' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}
+                >Secundarios</button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {!loading && !error && uniqueTypologies.length > 1 && (
+        {!loading && !error && tab === 'main' && uniqueTypologies.length > 1 && (
           <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 flex-shrink-0 overflow-x-auto">
-            <button
-              onClick={() => setActiveTypology('all')}
-              className={cn('px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors',
-                activeTypology === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              )}
-            >
-              Todas
-            </button>
-            {uniqueTypologies.map(typ => (
+            {(['all', ...uniqueTypologies] as string[]).map(typ => (
               <button
                 key={typ}
                 onClick={() => setActiveTypology(typ)}
                 className={cn('px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors',
                   activeTypology === typ ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 )}
-              >
-                {typ}
-              </button>
+              >{typ === 'all' ? 'Todos' : typ}</button>
+            ))}
+          </div>
+        )}
+
+        {!loading && !error && tab === 'secondary' && (
+          <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 flex-shrink-0 overflow-x-auto">
+            {([
+              { value: 'all',       label: 'Todos' },
+              { value: 'garage',    label: 'Estacionamientos' },
+              { value: 'warehouse', label: 'Bodegas' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setSecFilter(opt.value)}
+                className={cn('px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors',
+                  secFilter === opt.value ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                )}
+              >{opt.label}</button>
             ))}
           </div>
         )}
@@ -674,14 +722,63 @@ function UnitsModal({ project, units, loading, error, onClose }: {
             </div>
           )}
 
-          {!loading && !error && filtered.length === 0 && (
+          {/* ─── TABLA SECUNDARIOS ─── */}
+          {!loading && !error && tab === 'secondary' && (
+            filteredSecondary.length === 0 ? (
+              <div className="py-20 text-center">
+                <Home className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">Sin unidades secundarias para este proyecto</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 w-24">Tipo</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600">Número</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600">Precio UF</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600">Ubicación</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredSecondary.map(unit => (
+                    <tr key={unit.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2.5">
+                        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded',
+                          unit.type === 'garage' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
+                        )}>
+                          {unit.type === 'garage' ? 'Estacionamiento' : 'Bodega'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-gray-700">
+                        {unit.number}
+                        {unit.accessible && <span className="ml-1.5 text-[10px] text-blue-500 font-medium">♿</span>}
+                      </td>
+                      <td className="px-3 py-2.5 font-semibold text-gray-900">
+                        {unit.price != null ? (
+                          <span>
+                            {formatUF(unit.price)} UF
+                            {unit.priceReference && <span className="ml-1 text-[10px] text-gray-400 font-normal">(ref.)</span>}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-500 text-xs">
+                        {unit.location ?? (unit.priceReference ? unit.description : '—')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+
+          {!loading && !error && tab === 'main' && filtered.length === 0 && (
             <div className="py-20 text-center">
               <Home className="h-10 w-10 text-gray-200 mx-auto mb-3" />
               <p className="text-sm text-gray-400">No hay unidades disponibles</p>
             </div>
           )}
 
-          {!loading && !error && filtered.length > 0 && (
+          {!loading && !error && tab === 'main' && filtered.length > 0 && (
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -936,6 +1033,7 @@ export default function ExternalStockSearch() {
 
   const [selectedProject, setSelectedProject] = useState<CanonicalProject | null>(null)
   const [units, setUnits] = useState<JBUnit[]>([])
+  const [secondaryUnits, setSecondaryUnits] = useState<SecondaryUnit[]>([])
   const [loadingUnits, setLoadingUnits] = useState(false)
   const [unitsError, setUnitsError] = useState<string | null>(null)
 
@@ -1024,6 +1122,7 @@ export default function ExternalStockSearch() {
   async function handleProjectClick(project: CanonicalProject) {
     setSelectedProject(project)
     setUnits([])
+    setSecondaryUnits([])
     setUnitsError(null)
     setLoadingUnits(true)
     try {
@@ -1039,6 +1138,7 @@ export default function ExternalStockSearch() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error cargando unidades')
       setUnits(data.units)
+      setSecondaryUnits(data.secondaryUnits ?? [])
     } catch (e) {
       setUnitsError(e instanceof Error ? e.message : 'Error desconocido')
     } finally {
@@ -1362,9 +1462,10 @@ export default function ExternalStockSearch() {
         <UnitsModal
           project={selectedProject}
           units={units}
+          secondaryUnits={secondaryUnits}
           loading={loadingUnits}
           error={unitsError}
-          onClose={() => { setSelectedProject(null); setUnits([]); setUnitsError(null) }}
+          onClose={() => { setSelectedProject(null); setUnits([]); setSecondaryUnits([]); setUnitsError(null) }}
         />
       )}
 

@@ -24,6 +24,17 @@ type JBUnit = {
   hasStorage: boolean
 }
 
+export type SecondaryUnit = {
+  id: string
+  number: string
+  type: 'garage' | 'warehouse'
+  price: number | null
+  location: string | null
+  description: string | null
+  accessible?: boolean
+  priceReference?: boolean  // true = precio de referencia del proyecto, sin unidad individual
+}
+
 async function getJetBrokersUnits(sourceId: string): Promise<JBUnit[]> {
   // Leer desde BD (la API de JetBrokers bloquea requests server-to-server)
   const ep = await prisma.externalProject.findUnique({
@@ -80,6 +91,53 @@ async function getIrisUnits(projectId: string): Promise<JBUnit[]> {
   }))
 }
 
+async function getIrisSecondaryUnits(sourceId: string): Promise<SecondaryUnit[]> {
+  const ep = await prisma.externalProject.findUnique({
+    where: { source_sourceId: { source: 'iris', sourceId } },
+    select: { rawData: true },
+  })
+  if (!ep) return []
+
+  const raw = ep.rawData as Record<string, unknown>
+  const result: SecondaryUnit[] = []
+
+  // Garages — unidades individuales con datos completos
+  const garages = (raw.garages as Array<Record<string, unknown>> | undefined) ?? []
+  for (const g of garages) {
+    if (g.active === false) continue
+    const price = typeof g.price === 'number' ? g.price : parseFloat(String(g.price ?? ''))
+    result.push({
+      id: String(g.id),
+      number: String(g.name ?? g.description ?? g.id),
+      type: 'garage',
+      price: isNaN(price) ? null : price,
+      location: g.location != null && String(g.location) !== 'null' ? String(g.location) : null,
+      description: g.description ? String(g.description) : null,
+      accessible: Boolean(g.accesible),
+    })
+  }
+
+  // Bodegas — IRIS solo provee un precio de referencia a nivel proyecto
+  const depositRaw = raw.deposit
+  if (depositRaw) {
+    const depositStr = String(depositRaw).replace(/\./g, '').replace(',', '.')
+    const depositPrice = parseFloat(depositStr)
+    if (!isNaN(depositPrice) && depositPrice > 0) {
+      result.push({
+        id: 'deposit-ref',
+        number: '—',
+        type: 'warehouse',
+        price: depositPrice,
+        location: null,
+        description: 'Precio de referencia (sin detalle por unidad)',
+        priceReference: true,
+      })
+    }
+  }
+
+  return result
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -93,19 +151,21 @@ export async function POST(req: NextRequest) {
 
   try {
     let units: JBUnit[]
+    let secondaryUnits: SecondaryUnit[] = []
+
     if (source === 'jetbrokers') {
       units = await getJetBrokersUnits(sourceId)
     } else if (source === 'iris') {
-      // projectId is the ExternalProject.id (canonical links to it)
       const ep = await prisma.externalProject.findUnique({
         where: { source_sourceId: { source: 'iris', sourceId } },
         select: { id: true }
       })
       units = ep ? await getIrisUnits(ep.id) : []
+      secondaryUnits = await getIrisSecondaryUnits(sourceId)
     } else {
       return NextResponse.json({ error: `Fuente no soportada: ${source}` }, { status: 400 })
     }
-    return NextResponse.json({ units, total: units.length })
+    return NextResponse.json({ units, total: units.length, secondaryUnits })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error desconocido'
     return NextResponse.json({ error: msg }, { status: 502 })
