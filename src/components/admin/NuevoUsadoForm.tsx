@@ -266,7 +266,7 @@ function FeaturesStep({ data, onChange, onDone }: {
   const toggleOrientation = (o: string) => {
     const cur = data.orientations
     if (cur.includes(o)) onChange('orientations', cur.filter(x => x !== o))
-    else if (cur.length < 2) onChange('orientations', [...cur, o])
+    else onChange('orientations', [...cur, o])
   }
 
   return (
@@ -301,19 +301,16 @@ function FeaturesStep({ data, onChange, onDone }: {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-2">
-          Orientación <span className="text-gray-400 font-normal">(máx. 2)</span>
-        </label>
+        <label className="block text-xs font-medium text-gray-600 mb-2">Orientación</label>
         <div className="flex flex-wrap gap-2">
           {ORIENTATIONS.map(o => (
             <button key={o} type="button"
               onClick={() => toggleOrientation(o)}
-              disabled={!data.orientations.includes(o) && data.orientations.length >= 2}
               className={cn(
                 'w-12 h-12 rounded-lg border text-xs font-bold transition-colors',
-                data.orientations.includes(o) ? 'bg-brand-primary text-white border-brand-primary'
-                  : data.orientations.length >= 2 ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
-                                                  : 'bg-white text-gray-600 border-gray-200 hover:border-brand-primary'
+                data.orientations.includes(o)
+                  ? 'bg-brand-primary text-white border-brand-primary'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-brand-primary'
               )}
             >{o}</button>
           ))}
@@ -546,21 +543,24 @@ function PriceStep({ data, onChange, onDone, saving }: {
 // ─── Utilidades de imagen ─────────────────────────────
 
 // Comprime y redimensiona a JPEG. Reduce calidad si el resultado supera 600 KB.
+// Rechaza con error si la imagen no carga o si tarda más de 30 segundos.
 async function resizeToJpeg(file: File, maxPx = 1600): Promise<Blob> {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Timeout al comprimir imagen')), 30_000)
     const img = new Image()
     const url = URL.createObjectURL(file)
+    img.onerror = () => { clearTimeout(timer); URL.revokeObjectURL(url); reject(new Error('No se pudo cargar la imagen')) }
     img.onload = () => {
       const r = Math.min(maxPx / img.width, maxPx / img.height, 1)
       const c = document.createElement('canvas')
       c.width = Math.round(img.width * r); c.height = Math.round(img.height * r)
       c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
       URL.revokeObjectURL(url)
-      // Intenta 0.82; si supera 600 KB baja a 0.70; último recurso 0.55
       const encode = (q: number) =>
         c.toBlob(b => {
-          if (b && b.size > 600_000 && q > 0.55) encode(q - 0.12)
-          else resolve(b!)
+          if (!b) { clearTimeout(timer); reject(new Error('toBlob falló')); return }
+          if (b.size > 600_000 && q > 0.55) encode(q - 0.12)
+          else { clearTimeout(timer); resolve(b) }
         }, 'image/jpeg', q)
       encode(0.82)
     }
@@ -569,9 +569,11 @@ async function resizeToJpeg(file: File, maxPx = 1600): Promise<Blob> {
 }
 
 async function uploadToCloudinary(blob: Blob): Promise<string> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 60_000)
   const fd = new FormData()
   fd.append('file', blob, 'photo.jpg')
-  const res = await fetch('/api/admin/usados/upload', { method: 'POST', body: fd })
+  const res = await fetch('/api/admin/usados/upload', { method: 'POST', body: fd, signal: ctrl.signal }).finally(() => clearTimeout(timer))
   const json = await res.json()
   if (!json.url) throw new Error(json.error || 'Upload fallido')
   return json.url as string
@@ -591,7 +593,7 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
   const cameraRef  = useRef<HTMLInputElement>(null)
   const dragSrc = useRef<number | null>(null)
 
-  const handleFiles = async (files: FileList) => {
+  const handleFiles = async (files: FileList, inputEl?: HTMLInputElement | null) => {
     if (!files.length) return
     setUploading(true)
     const urls: string[] = [...images]
@@ -602,8 +604,12 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
         const url  = await uploadToCloudinary(blob)
         urls.push(url)
         onImagesChange([...urls])
-      } catch { /* skip failed */ }
+      } catch (err) {
+        console.error('Error subiendo foto', i + 1, err)
+      }
     }
+    // Resetear input para que onChange vuelva a disparar con los mismos archivos
+    if (inputEl) inputEl.value = ''
     setUploading(false)
     setProgress('')
   }
@@ -668,12 +674,12 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
       {/* Input galería — múltiples archivos */}
       <input
         ref={galleryRef} type="file" accept="image/*" multiple className="hidden"
-        onChange={e => e.target.files && handleFiles(e.target.files)}
+        onChange={e => e.target.files && handleFiles(e.target.files, e.target)}
       />
       {/* Input cámara — capture activa la cámara trasera y pide permiso */}
       <input
         ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
-        onChange={e => e.target.files && handleFiles(e.target.files)}
+        onChange={e => e.target.files && handleFiles(e.target.files, e.target)}
       />
 
       {/* Previews */}

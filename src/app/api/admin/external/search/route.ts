@@ -12,7 +12,8 @@ type SearchFilter = {
   bonoPieMin?: number
   priceMin?: number
   priceMax?: number
-  sources?: string[]   // ['iris','jetbrokers','brouk'] — vacío = todas
+  sources?: string[]    // ['iris','jetbrokers','brouk'] — vacío = todas
+  delivery?: 'immediate' | 'future'
 }
 
 export async function POST(req: NextRequest) {
@@ -73,6 +74,12 @@ export async function POST(req: NextRequest) {
         units: { some: { bonoPie: { gte: filter.bonoPieMin }, available: true } },
       },
     }
+  }
+
+  if (filter.delivery === 'immediate') {
+    where.stage = { in: ['deliveryReady', 'A estrenar'] }
+  } else if (filter.delivery === 'future') {
+    where.stage = { in: ['green', 'white', 'En pozo', 'En construcción'] }
   }
 
   // filterOptions: communes/stages solo de proyectos con unidades

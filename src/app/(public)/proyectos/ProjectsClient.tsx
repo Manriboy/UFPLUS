@@ -12,7 +12,8 @@ interface ProjectsClientProps {
   searchParams?: { [key: string]: string | undefined }
 }
 
-const deliveryTypes = ['IMMEDIATE', 'SOON', 'FUTURE', 'IN_CONSTRUCTION']
+// 'IMMEDIATE' = sólo IMMEDIATE; 'FUTURE' = SOON + FUTURE + IN_CONSTRUCTION
+const FUTURE_TYPES = new Set(['SOON', 'FUTURE', 'IN_CONSTRUCTION'])
 
 export default function ProjectsClient({
   initialProjects,
@@ -36,7 +37,8 @@ export default function ProjectsClient({
         (p.city || '').toLowerCase().includes(searchLower)
 
       const matchCommune = !commune || p.commune === commune
-      const matchDelivery = !deliveryType || p.deliveryType === deliveryType
+      const matchDelivery = !deliveryType ||
+        (deliveryType === 'IMMEDIATE' ? p.deliveryType === 'IMMEDIATE' : FUTURE_TYPES.has(p.deliveryType ?? ''))
       const matchPriceMin =
         !priceMin || (p.priceFrom !== null && p.priceFrom >= parseFloat(priceMin))
       const matchPriceMax =
@@ -128,9 +130,8 @@ export default function ProjectsClient({
                 className="px-3 py-2.5 border border-gray-200 text-sm text-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary min-w-[180px]"
               >
                 <option value="">Tipo de entrega</option>
-                {deliveryTypes.map((dt) => (
-                  <option key={dt} value={dt}>{DELIVERY_TYPE_LABELS[dt]}</option>
-                ))}
+                <option value="IMMEDIATE">Entrega inmediata</option>
+                <option value="FUTURE">Entrega futura</option>
               </select>
 
               {hasFilters && (
@@ -163,9 +164,8 @@ export default function ProjectsClient({
                 className="px-3 py-2.5 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
               >
                 <option value="">Tipo de entrega</option>
-                {deliveryTypes.map((dt) => (
-                  <option key={dt} value={dt}>{DELIVERY_TYPE_LABELS[dt]}</option>
-                ))}
+                <option value="IMMEDIATE">Entrega inmediata</option>
+                <option value="FUTURE">Entrega futura</option>
               </select>
               <input
                 type="number"
@@ -209,7 +209,7 @@ export default function ProjectsClient({
               )}
               {deliveryType && (
                 <span className="flex items-center gap-1 bg-red-50 text-brand-primary text-xs px-2.5 py-1 font-medium">
-                  {DELIVERY_TYPE_LABELS[deliveryType]}
+                  {deliveryType === 'IMMEDIATE' ? 'Entrega inmediata' : 'Entrega futura'}
                   <button onClick={() => setDeliveryType('')}><X className="w-3 h-3" /></button>
                 </span>
               )}

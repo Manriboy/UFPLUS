@@ -52,6 +52,7 @@ type SearchFilter = {
   priceMin?: number
   priceMax?: number
   sources?: string[]
+  delivery?: 'immediate' | 'future'  // 'immediate'=deliveryReady|A estrenar; 'future'=green|white|En pozo|En construcción
 }
 
 type JBUnit = {
@@ -91,16 +92,24 @@ const SOURCE_COLORS: Record<string, string> = {
   iris: 'bg-orange-500 text-white',
 }
 
+// Mapeo de todos los valores de stage existentes en BD
 const STAGE_LABELS: Record<string, string> = {
-  green: 'En construcción',
-  deliveryReady: 'Entrega inmediata',
-  white: 'Preventa',
+  deliveryReady:   'Entrega inmediata',
+  'A estrenar':    'Entrega inmediata',
+  green:           'En construcción',
+  'En construcción': 'En construcción',
+  'En pozo':       'En pozo',
+  white:           'Preventa',
 }
 
+// Verde para entrega inmediata; gris para entrega futura
 const STAGE_COLORS: Record<string, string> = {
-  green: 'bg-amber-100 text-amber-800',
-  deliveryReady: 'bg-emerald-100 text-emerald-800',
-  white: 'bg-blue-100 text-blue-800',
+  deliveryReady:     'bg-emerald-100 text-emerald-800',
+  'A estrenar':      'bg-emerald-100 text-emerald-800',
+  green:             'bg-gray-100 text-gray-600',
+  'En construcción': 'bg-gray-100 text-gray-600',
+  'En pozo':         'bg-gray-100 text-gray-600',
+  white:             'bg-gray-100 text-gray-600',
 }
 
 const FACING_LABELS: Record<string, string> = {
@@ -914,6 +923,7 @@ export default function ExternalStockSearch() {
   const [srcAws, setSrcAws] = useState(true)
   const [srcDrive, setSrcDrive] = useState(true)
   const [srcGcp, setSrcGcp] = useState(true)
+  const [delivery, setDelivery] = useState<'' | 'immediate' | 'future'>('')
 
   const handlePriceInput = (side: 'min' | 'max', raw: string) => {
     const v = Math.max(0, Math.min(PRICE_MAX, parseInt(raw) || 0))
@@ -979,9 +989,10 @@ export default function ExternalStockSearch() {
       ...(srcGcp   ? ['jetbrokers']  : []),
     ]
     if (sources.length < 3) filter.sources = sources
+    if (delivery) filter.delivery = delivery
 
     return filter
-  }, [q, selectedRegion, zoneIds, tipologias, bonoPieMin, priceRange, srcAws, srcDrive, srcGcp])
+  }, [q, selectedRegion, zoneIds, tipologias, bonoPieMin, priceRange, srcAws, srcDrive, srcGcp, delivery])
 
   const search = useCallback(async () => {
     if (!canSearch) return
@@ -1045,6 +1056,7 @@ export default function ExternalStockSearch() {
     setSrcAws(true)
     setSrcDrive(true)
     setSrcGcp(true)
+    setDelivery('')
   }
 
   const priceActive = priceRange[0] > 0 || priceRange[1] < PRICE_MAX
@@ -1193,6 +1205,32 @@ export default function ExternalStockSearch() {
                 <X className="h-4 w-4" />
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Fila 5: tipo de entrega */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-2">Tipo de entrega</label>
+          <div className="flex gap-2">
+            {([
+              { value: '' as const,           label: 'Todos' },
+              { value: 'immediate' as const,  label: 'Entrega inmediata' },
+              { value: 'future' as const,     label: 'Entrega futura' },
+            ]).map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDelivery(opt.value)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                  delivery === opt.value
+                    ? 'bg-brand-primary text-white border-brand-primary'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-brand-primary'
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 

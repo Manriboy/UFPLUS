@@ -69,7 +69,7 @@ export default function NearbyServices({ data }: { data: NearbyServicesData }) {
       {/* Items */}
       {items.length === 0 ? (
         <p className="text-sm text-gray-400 py-6 text-center">
-          Sin resultados en un radio de 2 km
+          Sin resultados en un radio de 1 km
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

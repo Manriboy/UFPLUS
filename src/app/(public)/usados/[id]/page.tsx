@@ -7,10 +7,11 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import ContactForm from '@/components/public/ContactForm'
 import ProjectCarousel from '@/components/public/ProjectCarousel'
-import NearbyServices, { type NearbyServicesData, type POI } from '@/components/public/NearbyServices'
+import NearbyServices, { type NearbyServicesData } from '@/components/public/NearbyServices'
 import { MapPin, ChevronRight, Bed, Bath, Car, Archive, Play, CheckCircle } from 'lucide-react'
 import { getEmbedUrl } from '@/lib/utils'
 import { getIndicadores } from '@/lib/indicadores'
+import { fetchNearbyServices } from '@/lib/nearby-services'
 
 interface Props {
   params: { id: string }
@@ -52,87 +53,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export const revalidate = false
 export const dynamicParams = true
 
-// ─── HERE Nearby Services ─────────────────────────────
-
-const HERE_CATEGORIES: Record<keyof NearbyServicesData, string> = {
-  transporte:  '400-4300',
-  educacion:   '600-6400',
-  areasVerdes: '550-5510',
-  comercios:   '600-6300-0066,600-6000-0061,600-6300-0082',
-  salud:       '800-8000',
-}
-
-const HERE_CATEGORY_LABELS: Record<string, string> = {
-  '400-4300-0035': 'Metro',
-  '400-4300-0036': 'Paradero',
-  '400-4300':      'Transporte público',
-  '600-6400-0000': 'Colegio',
-  '600-6400-0001': 'Universidad',
-  '600-6400-0062': 'Jardín infantil',
-  '600-6400':      'Educación',
-  '550-5510':      'Área verde',
-  '600-6300-0066': 'Supermercado',
-  '600-6000-0061': 'Farmacia',
-  '600-6300-0082': 'Centro comercial',
-  '800-8000-0159': 'Hospital',
-  '800-8000-0001': 'Clínica',
-  '800-8000':      'Salud',
-}
-
-function categoryLabel(categories: Array<{ id: string; name: string }> | undefined): string | undefined {
-  if (!categories?.length) return undefined
-  for (const cat of categories) {
-    if (HERE_CATEGORY_LABELS[cat.id]) return HERE_CATEGORY_LABELS[cat.id]
-  }
-  return categories[0]?.name
-}
-
-async function fetchHereTab(lat: number, lng: number, tab: keyof NearbyServicesData, apiKey: string): Promise<POI[]> {
-  try {
-    const url = new URL('https://browse.search.hereapi.com/v1/browse')
-    url.searchParams.set('at', `${lat},${lng}`)
-    url.searchParams.set('in', `circle:${lat},${lng};r=2000`)
-    url.searchParams.set('limit', '20')
-    url.searchParams.set('categories', HERE_CATEGORIES[tab])
-    url.searchParams.set('apiKey', apiKey)
-
-    const res = await fetch(url.toString(), { next: { revalidate: false } })
-    if (!res.ok) return []
-    const json = await res.json() as { items?: Array<{ title: string; distance: number; categories?: Array<{ id: string; name: string }> }> }
-    return (json.items ?? []).map(item => ({
-      title: item.title,
-      distance: item.distance,
-      category: categoryLabel(item.categories),
-    }))
-  } catch {
-    return []
-  }
-}
-
-async function fetchNearbyServices(lat: number, lng: number): Promise<NearbyServicesData | null> {
-  const apiKey = process.env.NEXT_PUBLIC_HERE_API_KEY
-  if (!apiKey) return null
-
-  const tabs = Object.keys(HERE_CATEGORIES) as Array<keyof NearbyServicesData>
-  const results = await Promise.all(tabs.map(tab => fetchHereTab(lat, lng, tab, apiKey)))
-
-  return {
-    transporte:  results[0],
-    educacion:   results[1],
-    areasVerdes: results[2],
-    comercios:   results[3],
-    salud:       results[4],
-  }
-}
+// ─── Nearby Services ──────────────────────────────────
+// Los servicios se cachean en nearbyServicesJson al publicar la propiedad.
+// Si el campo está vacío (propiedades antiguas), no se muestra la sección.
 
 export default async function UsadoDetailPage({ params }: Props) {
   const [preview, indicadores] = await Promise.all([canPreview(), getIndicadores()])
   const property = await getProperty(params.id, preview)
   if (!property) notFound()
 
-  const nearbyServices = property.lat && property.lng
-    ? await fetchNearbyServices(property.lat, property.lng)
-    : null
+  // Prioridad: caché en DB → búsqueda en vivo (para validar resultados durante discovery)
+  const nearbyServices: NearbyServicesData | null =
+    (property.nearbyServicesJson as NearbyServicesData | null) ??
+    (property.lat && property.lng ? await fetchNearbyServices(property.lat, property.lng) : null)
 
   const title = property.title || `Departamento en ${property.commune ?? property.region ?? 'Chile'}`
   const carouselImages = property.images.map(url => ({ url, alt: title }))
@@ -354,7 +287,7 @@ export default async function UsadoDetailPage({ params }: Props) {
               <p className="text-gray-500 text-xs mb-1 uppercase tracking-wider">Precio</p>
               <p className="font-display text-4xl font-bold text-brand-primary mb-1">
                 {ufPrice != null
-                  ? `${ufPrice.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} UF`
+                  ? `${Math.ceil(ufPrice).toLocaleString('es-CL')} UF`
                   : 'Consultar'}
               </p>
               {clpPrice != null && (

@@ -39,7 +39,7 @@ interface Rates { uf: number; dolar: number }
 function toUF(price: number | null, currency: string | null, rates: Rates | null): string {
   if (!price) return 'Consultar'
   const curr = currency ?? 'UF'
-  if (curr === 'UF') return `${price.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} UF`
+  if (curr === 'UF') return `${Math.ceil(price).toLocaleString('es-CL')} UF`
   if (!rates) return `${price.toLocaleString('es-CL')} ${curr}`
   let uf: number
   if (curr === 'CLP$') {
@@ -49,7 +49,7 @@ function toUF(price: number | null, currency: string | null, rates: Rates | null
   } else {
     return `${price.toLocaleString('es-CL')} ${curr}`
   }
-  return `${uf.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} UF`
+  return `${Math.ceil(uf).toLocaleString('es-CL')} UF`
 }
 
 // ─── Constantes ───────────────────────────────────────

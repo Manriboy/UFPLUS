@@ -84,6 +84,7 @@ model UsedProperty {
   price         Float?
   currency      String?        @default("UF")
   commonExpenses Int?
+  nearbyServicesJson Json?
   isFeatured    Boolean        @default(false)
   isArchived    Boolean        @default(false)
   createdAt     DateTime       @default(now())

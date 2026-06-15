@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { fetchNearbyServices } from '@/lib/nearby-services'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -30,6 +31,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const body = await req.json()
+
+  // Cachear servicios cercanos la primera vez que se publica (PENDING)
+  if (
+    body.status === 'PENDING' &&
+    !item.nearbyServicesJson &&
+    item.lat != null && item.lng != null
+  ) {
+    try {
+      body.nearbyServicesJson = await fetchNearbyServices(item.lat, item.lng)
+    } catch {
+      // no bloqueamos la publicación si falla
+    }
+  }
+
   const updated = await prisma.usedProperty.update({ where: { id: params.id }, data: body })
   return NextResponse.json(updated)
 }
