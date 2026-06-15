@@ -20,8 +20,10 @@ import {
   ShieldAlert,
   Home,
   Building2,
+  X,
   type LucideIcon,
 } from 'lucide-react'
+import { useMobileMenu } from './MobileMenuProvider'
 
 // ── Roles ──────────────────────────────────────────────
 
@@ -88,6 +90,10 @@ export default function AdminSidebar() {
   const { data: session } = useSession()
   const role       = (session?.user?.role as string) ?? ''
   const isSuperAdmin = role === 'SUPERADMIN'
+  const { open, close } = useMobileMenu()
+
+  // Cerrar al navegar en mobile
+  useEffect(() => { close() }, [pathname, close])
 
   const [flags, setFlags] = useState<Record<string, boolean> | null>(() => {
     if (typeof window === 'undefined') return null
@@ -126,8 +132,8 @@ export default function AdminSidebar() {
         ?.filter(c => hasRole(c.roles) && isEnabled(c.key)),
     }))
 
-  return (
-    <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200 min-h-screen overflow-hidden">
+  const sidebarContent = (
+    <aside className="flex flex-col w-full lg:w-60 bg-white border-r border-gray-200 min-h-screen overflow-hidden">
       {/* Logo */}
       <Link href="/" className="block bg-white px-5 py-4 border-b border-gray-100">
         <Image
@@ -218,6 +224,31 @@ export default function AdminSidebar() {
         </Link>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex">{sidebarContent}</div>
+
+      {/* Mobile overlay */}
+      {open && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50" onClick={close} />
+          {/* Drawer full-width */}
+          <div className="relative w-full max-w-xs flex flex-col">
+            <button
+              onClick={close}
+              className="absolute top-3 right-3 z-10 p-2 text-gray-500 hover:text-gray-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 

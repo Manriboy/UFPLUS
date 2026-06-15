@@ -15,6 +15,8 @@ const navLinks = [
   { href: '/#contacto', label: 'Contacto' },
 ]
 
+const portalLink = { href: '/admin', label: 'Mi Portal' }
+
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -81,6 +83,19 @@ export default function Header() {
             ))}
           </nav>
 
+          {/* Mi Portal — desktop */}
+          <Link
+            href={portalLink.href}
+            className={cn(
+              'hidden lg:inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md border transition-colors duration-150',
+              useDarkStyle
+                ? 'border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white'
+                : 'border-white/70 text-white hover:bg-white/10'
+            )}
+          >
+            {portalLink.label}
+          </Link>
+
           {/* CTA */}
           <div className="hidden lg:flex items-center gap-3">
             <a
@@ -134,7 +149,13 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
-            <div className="pt-3">
+            <Link
+              href={portalLink.href}
+              className="block px-4 py-3 text-sm font-semibold text-brand-primary border border-brand-primary rounded-md text-center mt-1"
+            >
+              Mi Portal
+            </Link>
+            <div className="pt-2">
               <Link href="/#contacto" className="btn-primary w-full text-sm text-center block">
                 Solicitar asesoría gratuita
               </Link>

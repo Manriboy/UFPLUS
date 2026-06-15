@@ -2,7 +2,7 @@
 // src/components/admin/NuevoUsadoForm.tsx
 import { useState, useRef, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { CheckCircle2, ChevronRight, Loader2, MapPin, Home, Sparkles, Camera, X, GripVertical, Star } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Loader2, MapPin, Home, Sparkles, Camera, ImagePlus, X, GripVertical, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const SinglePinMap = dynamic(() => import('./SinglePinMap'), { ssr: false })
@@ -545,7 +545,8 @@ function PriceStep({ data, onChange, onDone, saving }: {
 
 // ─── Utilidades de imagen ─────────────────────────────
 
-async function resizeToJpeg(file: File, maxPx = 1920, quality = 0.85): Promise<Blob> {
+// Comprime y redimensiona a JPEG. Reduce calidad si el resultado supera 600 KB.
+async function resizeToJpeg(file: File, maxPx = 1600): Promise<Blob> {
   return new Promise(resolve => {
     const img = new Image()
     const url = URL.createObjectURL(file)
@@ -555,7 +556,13 @@ async function resizeToJpeg(file: File, maxPx = 1920, quality = 0.85): Promise<B
       c.width = Math.round(img.width * r); c.height = Math.round(img.height * r)
       c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
       URL.revokeObjectURL(url)
-      c.toBlob(b => resolve(b!), 'image/jpeg', quality)
+      // Intenta 0.82; si supera 600 KB baja a 0.70; último recurso 0.55
+      const encode = (q: number) =>
+        c.toBlob(b => {
+          if (b && b.size > 600_000 && q > 0.55) encode(q - 0.12)
+          else resolve(b!)
+        }, 'image/jpeg', q)
+      encode(0.82)
     }
     img.src = url
   })
@@ -580,7 +587,8 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
 }) {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
+  const cameraRef  = useRef<HTMLInputElement>(null)
   const dragSrc = useRef<number | null>(null)
 
   const handleFiles = async (files: FileList) => {
@@ -625,31 +633,46 @@ function PhotosStep({ images, onImagesChange, onDone, saving }: {
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500">
-        Las fotos se redimensionan automáticamente antes de subirse (máx. 1920px, JPEG). Puedes subir varias a la vez.
+        Las fotos se comprimen automáticamente (máx. 1600px, JPEG) antes de subirse.
       </p>
 
-      {/* Drop zone */}
-      <div
-        onClick={() => inputRef.current?.click()}
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
-        className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-brand-primary hover:bg-brand-primary/5 transition-colors"
-      >
-        {uploading ? (
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-8 w-8 text-brand-primary animate-spin" />
-            <p className="text-sm text-gray-500">{progress}</p>
-          </div>
-        ) : (
-          <>
-            <Camera className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-600">Haz clic o arrastra fotos aquí</p>
-            <p className="text-xs text-gray-400 mt-1">JPG, PNG, HEIC — múltiples archivos permitidos</p>
-          </>
-        )}
-      </div>
+      {/* Botones galería + cámara */}
+      {uploading ? (
+        <div className="flex flex-col items-center gap-2 py-8">
+          <Loader2 className="h-8 w-8 text-brand-primary animate-spin" />
+          <p className="text-sm text-gray-500">{progress}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => galleryRef.current?.click()}
+            className="flex flex-col items-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-6 hover:border-brand-primary hover:bg-brand-primary/5 transition-colors"
+          >
+            <ImagePlus className="h-7 w-7 text-gray-400" />
+            <span className="text-sm font-medium text-gray-600">Galería</span>
+            <span className="text-xs text-gray-400">Selecciona fotos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => cameraRef.current?.click()}
+            className="flex flex-col items-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-6 hover:border-brand-primary hover:bg-brand-primary/5 transition-colors"
+          >
+            <Camera className="h-7 w-7 text-gray-400" />
+            <span className="text-sm font-medium text-gray-600">Cámara</span>
+            <span className="text-xs text-gray-400">Tomar foto</span>
+          </button>
+        </div>
+      )}
+
+      {/* Input galería — múltiples archivos */}
       <input
-        ref={inputRef} type="file" accept="image/*" multiple className="hidden"
+        ref={galleryRef} type="file" accept="image/*" multiple className="hidden"
+        onChange={e => e.target.files && handleFiles(e.target.files)}
+      />
+      {/* Input cámara — capture activa la cámara trasera y pide permiso */}
+      <input
+        ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
         onChange={e => e.target.files && handleFiles(e.target.files)}
       />
 

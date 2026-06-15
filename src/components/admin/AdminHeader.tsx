@@ -1,17 +1,19 @@
 'use client'
 // src/components/admin/AdminHeader.tsx
 import { signOut } from 'next-auth/react'
-import { LogOut, User, Bell, Menu } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
+import { useMobileMenu } from './MobileMenuProvider'
 
 interface Props {
   user: { name?: string | null; email: string; role: string }
 }
 
 export default function AdminHeader({ user }: Props) {
+  const { toggle } = useMobileMenu()
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30">
       {/* Mobile menu button */}
-      <button className="lg:hidden p-2 text-gray-600 hover:text-brand-primary">
+      <button onClick={toggle} className="lg:hidden p-2 text-gray-600 hover:text-brand-primary">
         <Menu className="h-5 w-5" />
       </button>
 

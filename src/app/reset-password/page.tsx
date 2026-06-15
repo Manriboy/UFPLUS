@@ -13,7 +13,8 @@ function ResetForm() {
   const [pw, setPw]         = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPw, setShowPw]   = useState(false)
-  const [showCf, setShowCf]   = useState(false)
+  const showCf = showPw
+  const toggleShow = () => setShowPw(v => !v)
   const [error, setError]     = useState('')
   const [saving, setSaving]   = useState(false)
   const [done, setDone]       = useState(false)
@@ -71,7 +72,7 @@ function ResetForm() {
                   className="input-field text-sm w-full pr-9"
                   autoFocus
                 />
-                <button type="button" onClick={() => setShowPw(v => !v)}
+                <button type="button" onClick={toggleShow}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -86,7 +87,7 @@ function ResetForm() {
                   onChange={e => setConfirm(e.target.value)}
                   className="input-field text-sm w-full pr-9"
                 />
-                <button type="button" onClick={() => setShowCf(v => !v)}
+                <button type="button" onClick={toggleShow}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showCf ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
