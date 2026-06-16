@@ -89,6 +89,17 @@ export default function UsadosTable({ initialFilter }: Props) {
   const [openStatusId, setOpenStatusId] = useState<string | null>(null)
   const [changingStatusId, setChangingStatusId] = useState<string | null>(null)
 
+  // Cerrar el dropdown de estado al hacer click afuera, sin interceptar el click
+  // (un overlay fixed inset-0 se tragaba el primer click en cualquier otro botón/link)
+  useEffect(() => {
+    if (!openStatusId) return
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-status-dropdown]')) setOpenStatusId(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openStatusId])
+
   const fetchItems = useCallback(async () => {
     setLoading(true)
     try {
@@ -171,11 +182,6 @@ export default function UsadosTable({ initialFilter }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Backdrop to close status dropdown */}
-      {openStatusId && (
-        <div className="fixed inset-0 z-10" onClick={() => setOpenStatusId(null)} />
-      )}
-
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
@@ -265,7 +271,7 @@ export default function UsadosTable({ initialFilter }: Props) {
                       </td>
                       <td className="px-4 py-3 text-center">
                         {canChangeStatus ? (
-                          <div className="relative inline-block">
+                          <div className="relative inline-block" data-status-dropdown>
                             <button
                               onClick={() => setOpenStatusId(openStatusId === item.id ? null : item.id)}
                               disabled={changingStatusId === item.id}

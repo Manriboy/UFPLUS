@@ -1,7 +1,9 @@
 // src/app/admin/page.tsx
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
+import { NAV_CONFIG } from '@/lib/admin-nav'
 import { formatPrice, DELIVERY_TYPE_LABELS, LEAD_STATUS_LABELS } from '@/lib/utils'
 import {
   FolderOpen,
@@ -73,7 +75,19 @@ async function getDashboardData() {
   }
 }
 
+async function getRedirectIfDashboardDisabled(): Promise<string | null> {
+  const setting = await prisma.setting.findUnique({ where: { key: 'admin_nav_flags' } })
+  if (!setting) return null
+  const flags: Record<string, boolean> = JSON.parse(setting.value)
+  if (flags.dashboard !== false) return null
+  const next = NAV_CONFIG.find(item => item.key !== 'dashboard' && flags[item.key] !== false)
+  return next?.href ?? null
+}
+
 export default async function AdminDashboard() {
+  const redirectHref = await getRedirectIfDashboardDisabled()
+  if (redirectHref) redirect(redirectHref)
+
   const data = await getDashboardData()
 
   const statCards = [
