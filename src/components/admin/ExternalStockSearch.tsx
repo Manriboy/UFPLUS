@@ -128,7 +128,7 @@ const FACING_LABELS: Record<string, string> = {
 }
 
 function formatUF(value: number): string {
-  return value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Math.ceil(value).toLocaleString('es-CL')
 }
 
 // ─── DualRangeSlider ──────────────────────────────────
@@ -550,12 +550,8 @@ function UnitsModal({ project, units, secondaryUnits, loading, error, onClose }:
     else { setSortField(field); setSortDir('asc') }
   }
 
-  const effectiveDiscount = (u: JBUnit) =>
-    u.discountRate > 0 ? u.discountRate : (project.maxBonoPie ?? 0)
-  const effectiveFinalPrice = (u: JBUnit) => {
-    const d = effectiveDiscount(u)
-    return d > 0 ? u.price * (1 - d / 100) : u.finalPrice
-  }
+  const effectiveDiscount = (u: JBUnit) => u.discountRate
+  const effectiveFinalPrice = (u: JBUnit) => u.finalPrice
 
   const filteredSecondary = secondaryUnits.filter(u =>
     secFilter === 'all' || u.type === (secFilter === 'garage' ? 'garage' : 'warehouse')
@@ -830,7 +826,7 @@ function UnitsModal({ project, units, secondaryUnits, loading, error, onClose }:
                     </td>
                     <td className="px-3 py-2.5">
                       {effectiveDiscount(unit) > 0
-                        ? <span className={cn('text-xs font-semibold text-emerald-600', unit.discountRate === 0 && 'opacity-70')}>
+                        ? <span className="text-xs font-semibold text-emerald-600">
                             {effectiveDiscount(unit).toFixed(1)}%
                           </span>
                         : <span className="text-gray-400">—</span>
@@ -846,6 +842,8 @@ function UnitsModal({ project, units, secondaryUnits, loading, error, onClose }:
               </tbody>
             </table>
           )}
+
+
         </div>
       </div>
     </div>
