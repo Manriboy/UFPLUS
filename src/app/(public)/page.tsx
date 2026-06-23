@@ -27,17 +27,16 @@ export const metadata: Metadata = {
 }
 
 async function getBannerConfig() {
-  const [active, imageUrl, linkEnabled, linkUrl] = await Promise.all([
-    prisma.setting.findUnique({ where: { key: 'banner_active' } }),
-    prisma.setting.findUnique({ where: { key: 'banner_image_url' } }),
-    prisma.setting.findUnique({ where: { key: 'banner_link_enabled' } }),
-    prisma.setting.findUnique({ where: { key: 'banner_link_url' } }),
-  ])
+  const rows = await prisma.setting.findMany({
+    where: { key: { in: ['banner_active', 'banner_image_url', 'banner_link_enabled', 'banner_link_url'] } },
+    select: { key: true, value: true },
+  })
+  const m = Object.fromEntries(rows.map(r => [r.key, r.value]))
   return {
-    isActive: active?.value === 'true',
-    imageUrl: imageUrl?.value ?? null,
-    isLinkEnabled: linkEnabled?.value === 'true',
-    linkUrl: linkUrl?.value ?? '',
+    isActive: m['banner_active'] === 'true',
+    imageUrl: m['banner_image_url'] ?? null,
+    isLinkEnabled: m['banner_link_enabled'] === 'true',
+    linkUrl: m['banner_link_url'] ?? '',
   }
 }
 

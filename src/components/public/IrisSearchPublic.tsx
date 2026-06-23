@@ -303,7 +303,7 @@ function ProjectCard({ project, isExpanded, onToggleUnits }: {
       <div className="relative h-44 bg-gray-100 flex-shrink-0">
         {project.images[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={project.images[0]} alt={project.title} className="w-full h-full object-cover" />
+          <img src={project.images[0]} alt={project.title} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Home className="h-10 w-10 text-gray-300" />

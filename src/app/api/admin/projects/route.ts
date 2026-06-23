@@ -36,9 +36,6 @@ export async function GET(req: NextRequest) {
       where,
       include: {
         images: { where: { isMain: true }, take: 1 },
-        typologies: { orderBy: { sortOrder: 'asc' } },
-        amenities: true,
-        financingOptions: true,
         _count: { select: { leads: true } },
       },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],

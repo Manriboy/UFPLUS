@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   Home,
   Building2,
+  KeyRound,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -76,6 +77,10 @@ const nav: NavItem[] = [
       { key: 'stock_ufplus.online',  label: 'Stock online',   href: '/admin/search' },
       { key: 'stock_ufplus.offline', label: 'Stock off-line', href: '/admin/search2' },
     ],
+  },
+  {
+    key: 'arriendos', label: 'Arriendos', href: '/admin/arriendos',
+    icon: KeyRound, roles: STAFF,
   },
   {
     key: 'banner', label: 'Banner publicitario', href: '/admin/banner',

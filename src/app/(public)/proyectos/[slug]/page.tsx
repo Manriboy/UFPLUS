@@ -1,5 +1,6 @@
 // src/app/(public)/proyectos/[slug]/page.tsx
 import { Metadata } from 'next'
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
@@ -19,7 +20,7 @@ interface Props {
   params: { slug: string }
 }
 
-async function getProject(slug: string) {
+const getProject = cache(async (slug: string) => {
   return prisma.project.findFirst({
     where: { slug, isActive: true, isArchived: false },
     include: {
@@ -29,7 +30,7 @@ async function getProject(slug: string) {
       images: { orderBy: [{ isMain: 'desc' }, { sortOrder: 'asc' }] },
     },
   })
-}
+})
 
 async function getRelated(commune: string | null, excludeId: string) {
   return prisma.project.findMany({

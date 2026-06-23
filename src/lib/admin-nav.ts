@@ -52,6 +52,11 @@ export const NAV_CONFIG: NavItemConfig[] = [
     ],
   },
   {
+    key: 'arriendos',
+    label: 'Arriendos',
+    href: '/admin/arriendos',
+  },
+  {
     key: 'banner',
     label: 'Banner publicitario',
     href: '/admin/banner',
