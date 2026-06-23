@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
 
   const clientId     = process.env.ML_CLIENT_ID!
   const clientSecret = process.env.ML_CLIENT_SECRET!
-  const redirectUri  = `${process.env.NEXTAUTH_URL}/api/admin/ml/callback`
+  const appUrl      = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? '').replace(/\/$/, '')
+  const redirectUri = `${appUrl}/api/admin/ml/callback`
 
   try {
     const res = await fetch('https://api.mercadolibre.com/oauth/token', {

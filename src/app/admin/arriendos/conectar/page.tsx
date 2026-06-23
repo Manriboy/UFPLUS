@@ -12,7 +12,7 @@ function buildAuthUrl(clientId: string, redirectUri: string) {
 
 export default function ConectarPage() {
   const clientId   = process.env.ML_CLIENT_ID ?? ''
-  const appUrl     = (process.env.NEXTAUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+  const appUrl     = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '')
   const redirectUri = `${appUrl}/api/admin/ml/callback`
   const authUrl    = buildAuthUrl(clientId, redirectUri)
 
