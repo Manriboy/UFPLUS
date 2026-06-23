@@ -37,10 +37,16 @@ function Inner({ authUrl, redirectUri }: Props) {
           <div>
             <p className="font-semibold">Error al conectar</p>
             <p className="mt-0.5">
-              {error === 'denied'  && 'Rechazaste el acceso en Mercado Libre.'}
-              {error === 'token'   && 'No se pudo intercambiar el código. Verifica que el Redirect URI esté configurado correctamente en ML.'}
-              {error === 'server'  && 'Error interno del servidor.'}
+              {error === 'denied'      && 'Rechazaste el acceso en Mercado Libre.'}
+              {error === 'token'       && 'Error al intercambiar el código con ML.'}
+              {error === 'token_fetch' && 'No se pudo conectar con la API de ML para intercambiar el código.'}
+              {error === 'db'          && 'Los tokens se obtuvieron pero falló al guardarlos en la base de datos.'}
+              {error === 'no_session'  && 'Tu sesión expiró durante la autorización. Inicia sesión y vuelve a intentarlo.'}
+              {error === 'server'      && 'Error interno del servidor.'}
             </p>
+            {sp.get('detail') && (
+              <code className="mt-1 block text-xs bg-red-100 rounded px-2 py-1 break-all">{sp.get('detail')}</code>
+            )}
           </div>
         </div>
       )}
