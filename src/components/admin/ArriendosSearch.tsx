@@ -380,7 +380,7 @@ export default function ArriendosSearch() {
       if (!res.ok) {
         const detail = await res.text().catch(() => '')
         console.error('[arriendos] ML search error:', res.status, detail)
-        throw new Error('Error de conexión')
+        throw new Error(`ML ${res.status}: ${detail.slice(0, 120)}`)
       }
 
       const data = await res.json()
@@ -520,9 +520,12 @@ export default function ArriendosSearch() {
 
       {/* ── Error ────────────────────────────────────────────────────────────── */}
       {error && (
-        <div className="mx-6 mt-4 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          Error de conexión
+        <div className="mx-6 mt-4 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Error de conexión</p>
+            <p className="text-xs mt-0.5 font-mono break-all">{error}</p>
+          </div>
         </div>
       )}
 
