@@ -8,7 +8,6 @@ export const dynamic = 'force-dynamic'
 const TT_API   = 'https://www.toctoc.com/api/mapa/GetProps'
 const PAGE_SIZE = 20
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseTtProp(row: any[]) {
   return {
     id:        String(row[1] ?? ''),
