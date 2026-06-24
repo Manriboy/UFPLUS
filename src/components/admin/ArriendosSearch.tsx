@@ -98,6 +98,40 @@ function ZonaAutocomplete({ value, onChange, onSearch }: {
 
 const ProjectMap = dynamic(() => import('./ProjectMap'), { ssr: false })
 
+// ── Normalizar resultados ML ──────────────────────────────────────────────────
+type MlAttribute = { id: string; value_name: string | null }
+type MlRawResult = {
+  id: string; title: string; price: number; currency_id: string
+  thumbnail: string; permalink: string
+  location?: { latitude?: number; longitude?: number }
+  address?: { neighborhood_name?: string; city_name?: string }
+  attributes: MlAttribute[]
+}
+
+function getAttribute(attrs: MlAttribute[], id: string) {
+  return attrs.find(a => a.id === id)?.value_name ?? null
+}
+function parseArea(v: string | null): number | null {
+  if (!v) return null
+  const n = parseFloat(v.replace(/[^\d.]/g, ''))
+  return isNaN(n) ? null : n
+}
+function normalizeListing(item: MlRawResult): Listing {
+  const attrs = item.attributes ?? []
+  return {
+    id: item.id, title: item.title, price: item.price, currencyId: item.currency_id,
+    thumbnail: item.thumbnail, permalink: item.permalink,
+    commune:     item.address?.neighborhood_name ?? item.address?.city_name ?? null,
+    bedrooms:    parseInt(getAttribute(attrs, 'BEDROOMS') ?? '') || null,
+    bathrooms:   parseInt(getAttribute(attrs, 'BATHROOMS') ?? '') || null,
+    coveredArea: parseArea(getAttribute(attrs, 'COVERED_AREA')),
+    totalArea:   parseArea(getAttribute(attrs, 'TOTAL_AREA')),
+    floor:       getAttribute(attrs, 'FLOOR'),
+    lat:         item.location?.latitude ?? null,
+    lng:         item.location?.longitude ?? null,
+  }
+}
+
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Listing = {
   id: string
@@ -302,31 +336,57 @@ export default function ArriendosSearch() {
   const [notConnected, setNotConnected] = useState(false)
   const [showMap, setShowMap] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const mlTokenRef = useRef<string | null>(null)
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
+  // Obtiene el token ML desde nuestro backend (con refresh automático)
+  const getToken = useCallback(async (): Promise<string | null> => {
+    if (mlTokenRef.current) return mlTokenRef.current
+    const res = await fetch('/api/admin/ml/token')
+    if (res.status === 403) { setNotConnected(true); return null }
+    if (!res.ok) return null
+    const data = await res.json()
+    mlTokenRef.current = data.token
+    return data.token
+  }, [])
+
+  // La búsqueda va directo al browser → ML (servidor bloqueado por ML)
   const runSearch = useCallback(async (f: SearchState, p: number) => {
     setLoading(true)
     setError(null)
-    const params = new URLSearchParams({
-      zona: f.zona,
-      dormitorios: String(f.dormitorios),
-      banos: String(f.banos),
-      precioMin: f.precioMin > 0 ? String(f.precioMin) : '0',
-      precioMax: f.precioMax < PRECIO_MAX ? String(f.precioMax) : '0',
-      offset: String(p * PAGE_SIZE),
-    })
     try {
-      const res = await fetch(`/api/admin/arriendos?${params}`)
-      const data = await res.json()
-      if (res.status === 403 && data.error === 'not_connected') {
-        setNotConnected(true)
-        return
+      const token = await getToken()
+      if (!token) return
+
+      const queryParts = ['arriendo departamento']
+      if (f.zona)            queryParts.push(f.zona)
+      if (f.dormitorios > 0) queryParts.push(`${f.dormitorios} dormitorios`)
+      if (f.banos > 0)       queryParts.push(`${f.banos} baños`)
+
+      const params = new URLSearchParams({
+        category: 'MLC1459',
+        q:        queryParts.join(' '),
+        limit:    String(PAGE_SIZE),
+        offset:   String(p * PAGE_SIZE),
+      })
+      if (f.precioMin > 0)          params.set('price_from', String(f.precioMin))
+      if (f.precioMax < PRECIO_MAX) params.set('price_to',   String(f.precioMax))
+
+      const res = await fetch(`https://api.mercadolibre.com/sites/MLC/search?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '')
+        console.error('[arriendos] ML search error:', res.status, detail)
+        throw new Error('Error de conexión')
       }
-      if (!res.ok) throw new Error(data.error ?? 'Error de servidor')
+
+      const data = await res.json()
       setNotConnected(false)
-      setResults(data.results ?? [])
-      setTotal(data.total ?? 0)
+      setResults((data.results ?? []).map(normalizeListing))
+      setTotal(data.paging?.total ?? 0)
       setSearched(true)
     } catch (e: any) {
       setError(e.message ?? 'Error de conexión')
@@ -335,7 +395,7 @@ export default function ArriendosSearch() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getToken])
 
   const handleSearch = () => {
     setFilters(pendingFilters)

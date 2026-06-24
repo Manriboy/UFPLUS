@@ -120,35 +120,43 @@ export async function GET(req: NextRequest) {
   const precioMax   = parseInt(sp.get('precioMax') ?? '0')
   const offset      = parseInt(sp.get('offset') ?? '0')
 
+  // Verificar que la cuenta esté conectada (token en DB)
   const token = await getUserToken()
   if (!token) {
     return NextResponse.json({ error: 'not_connected', message: 'Conecta tu cuenta de Mercado Libre primero' }, { status: 403 })
   }
 
-  // Query ML
-  const queryParts = ['arriendo', 'departamento']
-  if (zona)        queryParts.push(zona)
+  // Construir query de texto para ML
+  const queryParts = ['arriendo departamento']
+  if (zona)            queryParts.push(zona)
   if (dormitorios > 0) queryParts.push(`${dormitorios} dormitorios`)
-  if (banos > 0)   queryParts.push(`${banos} baños`)
+  if (banos > 0)       queryParts.push(`${banos} baños`)
 
   const params = new URLSearchParams({
     category: ML_CATEGORY,
     q:        queryParts.join(' '),
     limit:    String(ML_PAGE_SIZE),
     offset:   String(offset),
-    sort:     'price_asc',
   })
   if (precioMin > 0) params.set('price_from', String(precioMin))
   if (precioMax > 0) params.set('price_to',   String(precioMax))
 
   try {
     const url = `${ML_API}/sites/MLC/search?${params}`
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    console.log('[arriendos] search url:', url)
+
+    // Intentar con token primero; si falla con 401/403, reintentar sin auth
+    let res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+
+    if (res.status === 401 || res.status === 403) {
+      console.warn('[arriendos] token rejected, retrying without auth')
+      res = await fetch(url)
+    }
 
     if (!res.ok) {
       const err = await res.text()
       console.error('[arriendos] ML search error:', res.status, err)
-      return NextResponse.json({ error: 'Error de conexión', status: res.status }, { status: 502 })
+      return NextResponse.json({ error: 'Error de conexión', mlStatus: res.status, mlDetail: err.slice(0, 300) }, { status: 502 })
     }
 
     const data = await res.json()
