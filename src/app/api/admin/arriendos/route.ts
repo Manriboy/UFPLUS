@@ -113,27 +113,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'fetch_error', detail: `${msg}${cause ? ` | cause: ${cause}` : ''}` }, { status: 500 })
   }
 
-  // 2. Check status
+  // 2. Read body as text first (can only consume once)
+  const rawText = await res.text().catch(() => '')
+  const ct      = res.headers.get('content-type') ?? '(none)'
+
   if (res.status === 401 || res.status === 403) {
-    const detail = await res.text().catch(() => '')
-    console.error('[arriendos/tt] auth error:', res.status, detail.slice(0, 200))
-    return NextResponse.json({ error: 'token_expired', detail: `HTTP ${res.status}` }, { status: 401 })
+    console.error('[arriendos/tt] auth error:', res.status, rawText.slice(0, 200))
+    return NextResponse.json({ error: 'token_expired', detail: `HTTP ${res.status} | ${ct}` }, { status: 401 })
   }
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    console.error('[arriendos/tt] HTTP error:', res.status, detail.slice(0, 300))
-    return NextResponse.json({ error: 'tt_error', detail: `HTTP ${res.status}: ${detail.slice(0, 200)}` }, { status: 502 })
+    console.error('[arriendos/tt] HTTP error:', res.status, rawText.slice(0, 300))
+    return NextResponse.json({ error: 'tt_error', detail: `HTTP ${res.status} ${ct}: ${rawText.slice(0, 200)}` }, { status: 502 })
+  }
+
+  if (!rawText) {
+    return NextResponse.json({ error: 'empty_response', detail: `HTTP ${res.status} | content-type: ${ct} | body vacío` }, { status: 502 })
   }
 
   // 3. Parse JSON
   let data: any
   try {
-    data = await res.json()
-  } catch (e: unknown) {
-    const text = await res.text().catch(() => '(no body)')
-    console.error('[arriendos/tt] JSON parse error, body preview:', text.slice(0, 300))
-    return NextResponse.json({ error: 'parse_error', detail: `Invalid JSON: ${text.slice(0, 150)}` }, { status: 502 })
+    data = JSON.parse(rawText)
+  } catch {
+    return NextResponse.json({ error: 'parse_error', detail: `HTTP ${res.status} ${ct}: ${rawText.slice(0, 200)}` }, { status: 502 })
   }
 
   // 4. Extract results
