@@ -18,6 +18,16 @@ export type NavItemConfig = {
 // Ítems controlables por flags (NO incluye el grupo Superadmin).
 export const NAV_CONFIG: NavItemConfig[] = [
   {
+    key: 'stock-usados',
+    label: 'Stock usados (Broker)',
+    href: '/admin/stock-usados',
+  },
+  {
+    key: 'mis-publicaciones',
+    label: 'Mis publicaciones',
+    href: '/admin/mis-publicaciones',
+  },
+  {
     key: 'dashboard',
     label: 'Dashboard',
     href: '/admin',
@@ -27,8 +37,8 @@ export const NAV_CONFIG: NavItemConfig[] = [
     label: 'Proyectos',
     href: '/admin/proyectos',
     children: [
-      { key: 'proyectos.todos', label: 'Todos los proyectos', href: '/admin/proyectos' },
-      { key: 'proyectos.nuevo', label: 'Nuevo proyecto', href: '/admin/proyectos/nuevo' },
+      { key: 'proyectos.nuevos',       label: 'Departamentos', href: '/admin/proyectos' },
+      { key: 'proyectos.aprobaciones', label: 'Aprobaciones',  href: '/admin/proyectos/aprobaciones' },
     ],
   },
   {
@@ -46,8 +56,9 @@ export const NAV_CONFIG: NavItemConfig[] = [
     label: 'Stock UFPLUS',
     href: '/admin/stock-unificado',
     children: [
-      { key: 'stock_ufplus.unificado', label: 'Stock unificado', href: '/admin/stock-unificado' },
-      { key: 'stock_ufplus.online', label: 'Stock online', href: '/admin/search' },
+      { key: 'stock_ufplus.nuevos',  label: 'Stock nuevos',   href: '/admin/stock-unificado' },
+      { key: 'stock_ufplus.usados',  label: 'Stock usados',   href: '/admin/stock-usados' },
+      { key: 'stock_ufplus.online',  label: 'Stock online',   href: '/admin/search' },
       { key: 'stock_ufplus.offline', label: 'Stock off-line', href: '/admin/search2' },
     ],
   },
@@ -55,6 +66,10 @@ export const NAV_CONFIG: NavItemConfig[] = [
     key: 'arriendos',
     label: 'Arriendos',
     href: '/admin/arriendos',
+    children: [
+      { key: 'arriendos.buscar', label: 'Buscador',          href: '/admin/arriendos' },
+      { key: 'arriendos.toctoc', label: 'Configurar TocToc', href: '/admin/arriendos/toctoc' },
+    ],
   },
   {
     key: 'banner',

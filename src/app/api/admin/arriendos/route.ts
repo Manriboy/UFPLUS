@@ -8,9 +8,8 @@ export const dynamic = 'force-dynamic'
 const TT_API   = 'https://www.toctoc.com/api/mapa/GetProps'
 const PAGE_SIZE = 20
 
-type TtProp = any[]
-
-function parseTtProp(row: TtProp) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseTtProp(row: any[]) {
   return {
     id:        String(row[1] ?? ''),
     lng:       typeof row[2]  === 'number' ? row[2]  : null,
@@ -91,37 +90,58 @@ export async function GET(req: NextRequest) {
     santander:               false,
   }
 
+  // 1. Fetch
+  let res: Response
   try {
-    const res = await fetch(TT_API, {
+    res = await fetch(TT_API, {
       method: 'POST',
       headers: {
-        accept:           'application/json',
-        'content-type':   'application/json',
-        'user-agent':     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
-        origin:           'https://www.toctoc.com',
-        referer:          'https://www.toctoc.com/resultados/lista/arriendo/departamento/',
-        'x-access-token': accessRow.value,
-        cookie:           `tt-jwt-gauth=${gAuthRow.value}`,
+        'Accept':           'application/json',
+        'Content-Type':     'application/json',
+        'User-Agent':       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        'Origin':           'https://www.toctoc.com',
+        'Referer':          'https://www.toctoc.com/resultados/lista/arriendo/departamento/',
+        'x-access-token':   accessRow.value,
+        'Cookie':           `tt-jwt-gauth=${gAuthRow.value}`,
       },
       body: JSON.stringify(body),
+      cache: 'no-store',
     })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+    const cause = e instanceof Error && e.cause ? String(e.cause) : ''
+    console.error('[arriendos/tt] fetch threw:', msg, cause)
+    return NextResponse.json({ error: 'fetch_error', detail: `${msg}${cause ? ` | cause: ${cause}` : ''}` }, { status: 500 })
+  }
 
-    if (res.status === 401 || res.status === 403) {
-      const detail = await res.text().catch(() => '')
-      console.error('[arriendos/tt] auth error:', res.status, detail.slice(0, 200))
-      return NextResponse.json({ error: 'token_expired' }, { status: 401 })
-    }
+  // 2. Check status
+  if (res.status === 401 || res.status === 403) {
+    const detail = await res.text().catch(() => '')
+    console.error('[arriendos/tt] auth error:', res.status, detail.slice(0, 200))
+    return NextResponse.json({ error: 'token_expired', detail: `HTTP ${res.status}` }, { status: 401 })
+  }
 
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '')
-      console.error('[arriendos/tt] error:', res.status, detail.slice(0, 200))
-      return NextResponse.json({ error: 'tt_error', detail: detail.slice(0, 200) }, { status: 502 })
-    }
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '')
+    console.error('[arriendos/tt] HTTP error:', res.status, detail.slice(0, 300))
+    return NextResponse.json({ error: 'tt_error', detail: `HTTP ${res.status}: ${detail.slice(0, 200)}` }, { status: 502 })
+  }
 
-    const data       = await res.json()
+  // 3. Parse JSON
+  let data: any
+  try {
+    data = await res.json()
+  } catch (e: unknown) {
+    const text = await res.text().catch(() => '(no body)')
+    console.error('[arriendos/tt] JSON parse error, body preview:', text.slice(0, 300))
+    return NextResponse.json({ error: 'parse_error', detail: `Invalid JSON: ${text.slice(0, 150)}` }, { status: 502 })
+  }
+
+  // 4. Extract results
+  try {
     const resultados = data.resultados ?? {}
-    const props: TtProp[] = resultados.Propiedades ?? []
-    const total: number   = resultados.Total ?? props.length
+    const props: any[] = resultados.Propiedades ?? []
+    const total: number = resultados.Total ?? props.length
 
     return NextResponse.json({
       results:  props.map(parseTtProp),
@@ -129,8 +149,10 @@ export async function GET(req: NextRequest) {
       page,
       pageSize: PAGE_SIZE,
     })
-  } catch (e) {
-    console.error('[arriendos/tt] fetch error:', e)
-    return NextResponse.json({ error: 'fetch_error' }, { status: 500 })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const keys = Object.keys(data ?? {}).join(', ')
+    console.error('[arriendos/tt] data error:', msg, 'top keys:', keys)
+    return NextResponse.json({ error: 'data_error', detail: `${msg} | keys: ${keys}` }, { status: 500 })
   }
 }
