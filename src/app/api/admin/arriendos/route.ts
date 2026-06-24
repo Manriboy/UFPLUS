@@ -1,4 +1,3 @@
-// src/app/api/admin/arriendos/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -6,168 +5,132 @@ import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-const ML_API      = 'https://api.mercadolibre.com'
-const ML_CATEGORY = 'MLC1459'
-const ML_PAGE_SIZE = 48
+const TT_API   = 'https://www.toctoc.com/api/mapa/GetProps'
+const PAGE_SIZE = 20
 
-// ── Token de usuario (authorization_code) con refresh automático ──────────────
-async function getUserToken(): Promise<string | null> {
-  try {
-    const [atRow, rtRow, expRow] = await Promise.all([
-      prisma.setting.findUnique({ where: { key: 'ml_access_token' } }),
-      prisma.setting.findUnique({ where: { key: 'ml_refresh_token' } }),
-      prisma.setting.findUnique({ where: { key: 'ml_token_expires_at' } }),
-    ])
+type TtProp = any[]
 
-    if (!atRow || !rtRow) return null
-
-    const expiresAt = expRow ? Number(expRow.value) : 0
-    const needsRefresh = Date.now() > expiresAt - 5 * 60 * 1000 // 5 min buffer
-
-    if (!needsRefresh) return atRow.value
-
-    // Refrescar token
-    const res = await fetch(`${ML_API}/oauth/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type:    'refresh_token',
-        client_id:     process.env.ML_CLIENT_ID!,
-        client_secret: process.env.ML_CLIENT_SECRET!,
-        refresh_token: rtRow.value,
-      }),
-    })
-
-    if (!res.ok) {
-      console.error('[arriendos] Refresh failed:', res.status, await res.text())
-      return atRow.value // devolver el token viejo como fallback
-    }
-
-    const data = await res.json()
-    const newExpiry = Date.now() + data.expires_in * 1000
-
-    await Promise.all([
-      prisma.setting.update({ where: { key: 'ml_access_token' }, data: { value: data.access_token } }),
-      prisma.setting.update({ where: { key: 'ml_refresh_token' }, data: { value: data.refresh_token } }),
-      prisma.setting.upsert({
-        where: { key: 'ml_token_expires_at' },
-        create: { key: 'ml_token_expires_at', value: String(newExpiry) },
-        update: { value: String(newExpiry) },
-      }),
-    ])
-
-    return data.access_token
-  } catch (e) {
-    console.error('[arriendos] getUserToken error:', e)
-    return null
-  }
-}
-
-// ── Normalizar resultado ML ───────────────────────────────────────────────────
-type MlAttribute = { id: string; value_name: string | null }
-type MlRawResult = {
-  id: string
-  title: string
-  price: number
-  currency_id: string
-  thumbnail: string
-  permalink: string
-  location?: { latitude?: number; longitude?: number }
-  address?: { neighborhood_name?: string; city_name?: string }
-  attributes: MlAttribute[]
-}
-
-function getAttribute(attrs: MlAttribute[], id: string): string | null {
-  return attrs.find(a => a.id === id)?.value_name ?? null
-}
-
-function parseArea(v: string | null): number | null {
-  if (!v) return null
-  const n = parseFloat(v.replace(/[^\d.]/g, ''))
-  return isNaN(n) ? null : n
-}
-
-function normalize(item: MlRawResult) {
-  const attrs = item.attributes ?? []
+function parseTtProp(row: TtProp) {
   return {
-    id:          item.id,
-    title:       item.title,
-    price:       item.price,
-    currencyId:  item.currency_id,
-    thumbnail:   item.thumbnail,
-    permalink:   item.permalink,
-    commune:     item.address?.neighborhood_name ?? item.address?.city_name ?? null,
-    bedrooms:    parseInt(getAttribute(attrs, 'BEDROOMS') ?? '') || null,
-    bathrooms:   parseInt(getAttribute(attrs, 'BATHROOMS') ?? '') || null,
-    coveredArea: parseArea(getAttribute(attrs, 'COVERED_AREA')),
-    totalArea:   parseArea(getAttribute(attrs, 'TOTAL_AREA')),
-    floor:       getAttribute(attrs, 'FLOOR'),
-    lat:         item.location?.latitude ?? null,
-    lng:         item.location?.longitude ?? null,
+    id:        String(row[1] ?? ''),
+    lng:       typeof row[2]  === 'number' ? row[2]  : null,
+    lat:       typeof row[3]  === 'number' ? row[3]  : null,
+    bedrooms:  typeof row[4]  === 'number' ? row[4]  : null,
+    commune:   typeof row[7]  === 'string' ? row[7]  : null,
+    bathrooms: typeof row[8]  === 'number' ? row[8]  : null,
+    thumbnail: typeof row[20] === 'string' ? row[20] : null,
+    area:      typeof row[21] === 'number' ? row[21] : null,
+    priceCLP:  typeof row[22] === 'number' ? row[22] : null,
+    priceUF:   typeof row[24] === 'number' ? row[24] : null,
+    title:     typeof row[39] === 'string' ? row[39] : null,
+    permalink: typeof row[40] === 'string' ? row[40] : null,
   }
 }
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const sp          = req.nextUrl.searchParams
-  const zona        = sp.get('zona')?.trim() ?? ''
-  const dormitorios = parseInt(sp.get('dormitorios') ?? '0')
-  const banos       = parseInt(sp.get('banos') ?? '0')
-  const precioMin   = parseInt(sp.get('precioMin') ?? '0')
-  const precioMax   = parseInt(sp.get('precioMax') ?? '0')
-  const offset      = parseInt(sp.get('offset') ?? '0')
+  const sp             = req.nextUrl.searchParams
+  const busqueda       = sp.get('zona')?.trim()      ?? ''
+  const dormitorios    = parseInt(sp.get('dormitorios')  ?? '0') || 0
+  const banos          = parseInt(sp.get('banos')        ?? '0') || 0
+  const precioDesdeUF  = parseFloat(sp.get('precioMinUF') ?? '0') || 0
+  const precioHastaUF  = parseFloat(sp.get('precioMaxUF') ?? '0') || 0
+  const superfMin      = parseInt(sp.get('superfMin')    ?? '0') || 0
+  const superfMax      = parseInt(sp.get('superfMax')    ?? '0') || 0
+  const ordenarPor     = parseInt(sp.get('orden')        ?? '0') || 0
+  const page           = Math.max(1, parseInt(sp.get('page') ?? '1') || 1)
 
-  // Verificar que la cuenta esté conectada (token en DB)
-  const token = await getUserToken()
-  if (!token) {
-    return NextResponse.json({ error: 'not_connected', message: 'Conecta tu cuenta de Mercado Libre primero' }, { status: 403 })
+  const [gAuthRow, accessRow] = await Promise.all([
+    prisma.setting.findUnique({ where: { key: 'tt_jwt_gauth'    } }),
+    prisma.setting.findUnique({ where: { key: 'tt_access_token' } }),
+  ])
+
+  if (!gAuthRow?.value || !accessRow?.value) {
+    return NextResponse.json({ error: 'not_connected' }, { status: 403 })
   }
 
-  // Construir query de texto para ML
-  const queryParts = ['arriendo departamento']
-  if (zona)            queryParts.push(zona)
-  if (dormitorios > 0) queryParts.push(`${dormitorios} dormitorios`)
-  if (banos > 0)       queryParts.push(`${banos} baños`)
-
-  const params = new URLSearchParams({
-    category: ML_CATEGORY,
-    q:        queryParts.join(' '),
-    limit:    String(ML_PAGE_SIZE),
-    offset:   String(offset),
-  })
-  if (precioMin > 0) params.set('price_from', String(precioMin))
-  if (precioMax > 0) params.set('price_to',   String(precioMax))
+  const body = {
+    region: '', comuna: '', barrio: '', poi: '',
+    tipoVista:               'lista',
+    operacion:               2,
+    idPoligono:              0,
+    moneda:                  2,
+    precioDesde:             precioDesdeUF,
+    precioHasta:             precioHastaUF,
+    dormitoriosDesde:        dormitorios,
+    dormitoriosHasta:        0,
+    banosDesde:              banos,
+    banosHasta:              0,
+    tipoPropiedad:           'departamento',
+    estado:                  0,
+    disponibilidadEntrega:   '',
+    numeroDeDiasTocToc:      0,
+    superficieDesdeUtil:     superfMin,
+    superficieHastaUtil:     superfMax,
+    superficieDesdeConstruida: 0,
+    superficieHastaConstruida: 0,
+    superficieDesdeTerraza:  0,
+    superficieHastaTerraza:  0,
+    superficieDesdeTerreno:  0,
+    superficieHastaTerreno:  0,
+    ordenarPor,
+    pagina:                  page,
+    paginaInterna:           1,
+    zoom:                    15,
+    idZonaHomogenea:         0,
+    busqueda,
+    viewport:                '',
+    atributos:               [],
+    publicador:              0,
+    temporalidad:            0,
+    limite:                  PAGE_SIZE,
+    cargaBanner:             false,
+    primeraCarga:            false,
+    santander:               false,
+  }
 
   try {
-    const url = `${ML_API}/sites/MLC/search?${params}`
-    console.log('[arriendos] search url:', url)
-
-    // Intentar con token primero; si falla con 401/403, reintentar sin auth
-    let res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await fetch(TT_API, {
+      method: 'POST',
+      headers: {
+        accept:           'application/json',
+        'content-type':   'application/json',
+        'user-agent':     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        origin:           'https://www.toctoc.com',
+        referer:          'https://www.toctoc.com/resultados/lista/arriendo/departamento/',
+        'x-access-token': accessRow.value,
+        cookie:           `tt-jwt-gauth=${gAuthRow.value}`,
+      },
+      body: JSON.stringify(body),
+    })
 
     if (res.status === 401 || res.status === 403) {
-      console.warn('[arriendos] token rejected, retrying without auth')
-      res = await fetch(url)
+      const detail = await res.text().catch(() => '')
+      console.error('[arriendos/tt] auth error:', res.status, detail.slice(0, 200))
+      return NextResponse.json({ error: 'token_expired' }, { status: 401 })
     }
 
     if (!res.ok) {
-      const err = await res.text()
-      console.error('[arriendos] ML search error:', res.status, err)
-      return NextResponse.json({ error: 'Error de conexión', mlStatus: res.status, mlDetail: err.slice(0, 300) }, { status: 502 })
+      const detail = await res.text().catch(() => '')
+      console.error('[arriendos/tt] error:', res.status, detail.slice(0, 200))
+      return NextResponse.json({ error: 'tt_error', detail: detail.slice(0, 200) }, { status: 502 })
     }
 
-    const data = await res.json()
+    const data       = await res.json()
+    const resultados = data.resultados ?? {}
+    const props: TtProp[] = resultados.Propiedades ?? []
+    const total: number   = resultados.Total ?? props.length
+
     return NextResponse.json({
-      results:  (data.results ?? []).map(normalize),
-      total:    data.paging?.total ?? 0,
-      offset:   data.paging?.offset ?? 0,
-      pageSize: ML_PAGE_SIZE,
+      results:  props.map(parseTtProp),
+      total,
+      page,
+      pageSize: PAGE_SIZE,
     })
   } catch (e) {
-    console.error('[arriendos] fetch error:', e)
-    return NextResponse.json({ error: 'Error de conexión' }, { status: 500 })
+    console.error('[arriendos/tt] fetch error:', e)
+    return NextResponse.json({ error: 'fetch_error' }, { status: 500 })
   }
 }

@@ -81,6 +81,10 @@ const nav: NavItem[] = [
   {
     key: 'arriendos', label: 'Arriendos', href: '/admin/arriendos',
     icon: KeyRound, roles: STAFF,
+    children: [
+      { key: 'arriendos.buscar',    label: 'Buscador',        href: '/admin/arriendos',        roles: STAFF },
+      { key: 'arriendos.toctoc',    label: 'Configurar TocToc', href: '/admin/arriendos/toctoc', roles: STAFF },
+    ],
   },
   {
     key: 'banner', label: 'Banner publicitario', href: '/admin/banner',

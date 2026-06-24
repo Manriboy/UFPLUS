@@ -10,7 +10,7 @@ export default function ArriendosPage() {
       <div className="px-6 pt-6 pb-2 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold text-brand-text">Arriendos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Busca valores de arriendo en Portal Inmobiliario</p>
+          <p className="text-sm text-gray-500 mt-0.5">Busca valores de arriendo en TocToc</p>
         </div>
         <IndicadoresWidget />
       </div>
