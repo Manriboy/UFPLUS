@@ -256,10 +256,13 @@ function ListingCard({ listing, selected, onClick }: { listing: Listing; selecte
   )
 }
 
+// ── Bounds type ───────────────────────────────────────────────────────────────
+type MapBounds = { north: number; south: number; east: number; west: number; centerLat: number; centerLng: number }
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ArriendosSearch() {
   const [zona, setZona]               = useState('')
-  const [results, setResults]         = useState<Listing[]>([])
+  const [allResults, setAllResults]   = useState<Listing[]>([])
   const [total, setTotal]             = useState(0)
   const [loading, setLoading]         = useState(false)
   const [searched, setSearched]       = useState(false)
@@ -267,10 +270,10 @@ export default function ArriendosSearch() {
   const [comunaMatch, setComunaMatch] = useState<string | null>(null)
   const [selectedId, setSelectedId]   = useState<string | null>(null)
   const [view, setView]               = useState<'map' | 'grid'>('map')
-  const [activeZona, setActiveZona]   = useState('')
   const [dormFilter, setDormFilter]   = useState(0)
   const [banoFilter, setBanoFilter]   = useState(0)
-  const mapCenterRef = useRef<{ lat: number; lng: number } | null>(null)
+  const [visibleBounds, setVisibleBounds] = useState<MapBounds | null>(null)
+  const boundsRef = useRef<MapBounds | null>(null)
 
   const runSearch = useCallback(async (z: string) => {
     setLoading(true)
@@ -283,13 +286,14 @@ export default function ArriendosSearch() {
         throw new Error(data.detail ?? data.error ?? `Error ${res.status}`)
       }
       const data = await res.json()
-      setResults(data.results ?? [])
+      setAllResults(data.results ?? [])
       setTotal(data.total ?? 0)
       setComunaMatch(data.comunaMatch ?? null)
+      setVisibleBounds(null)
       setSearched(true)
     } catch (e: any) {
       setError(e.message ?? 'Error de conexión')
-      setResults([])
+      setAllResults([])
       setTotal(0)
     } finally {
       setLoading(false)
@@ -297,31 +301,39 @@ export default function ArriendosSearch() {
   }, [])
 
   const handleSearch = () => {
-    setActiveZona(zona); setSelectedId(null)
+    setSelectedId(null)
     runSearch(zona)
   }
 
+  // "Buscar en esta zona": filtra los resultados ya cargados por los bounds actuales del mapa
   const handleSearchInZone = () => {
-    if (!mapCenterRef.current) return
-    const { lat, lng } = mapCenterRef.current
-    const nearest = findNearestComuna(lat, lng)
-    setZona(nearest)
-    setActiveZona(nearest)
+    const b = boundsRef.current
+    if (!b) return
+    setVisibleBounds({ ...b })
     setSelectedId(null)
-    runSearch(nearest)
+
+    // Si no hay resultados cargados para esta zona, carga la comuna del centro
+    if (allResults.length === 0) {
+      const nearest = findNearestComuna(b.centerLat, b.centerLng)
+      setZona(nearest)
+      runSearch(nearest)
+    }
   }
 
-  // Client-side filter by dormitorios/baños
+  // Filter: dormitorios + baños + bounds del mapa
   const filtered = useMemo(() =>
-    results.filter(r => {
+    allResults.filter(r => {
       if (dormFilter > 0 && (r.bedrooms == null || r.bedrooms < dormFilter)) return false
       if (banoFilter > 0 && (r.bathrooms == null || r.bathrooms < banoFilter)) return false
+      if (visibleBounds && r.lat != null && r.lng != null) {
+        if (r.lat < visibleBounds.south || r.lat > visibleBounds.north) return false
+        if (r.lng < visibleBounds.west  || r.lng > visibleBounds.east)  return false
+      }
       return true
     }),
-    [results, dormFilter, banoFilter]
+    [allResults, dormFilter, banoFilter, visibleBounds]
   )
 
-  // Average price from filtered results with CLP
   const avgPrice = useMemo(() => {
     const prices = filtered.filter(r => r.priceCLP != null).map(r => r.priceCLP!)
     if (prices.length === 0) return null
@@ -431,9 +443,9 @@ export default function ArriendosSearch() {
               ) : (
                 <>
                   <span className="font-semibold text-brand-text">{filtered.length}</span> departamentos
-                  {filtered.length < results.length && <span className="text-gray-400"> (de {results.length} en esta página)</span>}
+                  {filtered.length < allResults.length && <span className="text-gray-400"> (de {allResults.length} total)</span>}
                   {comunaMatch && <span className="text-gray-400"> en {comunaMatch}</span>}
-                  {!comunaMatch && activeZona && <span className="text-gray-400"> en Región Metropolitana</span>}
+                  {visibleBounds && <span className="text-gray-400"> · vista del mapa</span>}
                 </>
               )}
             </p>
@@ -466,7 +478,7 @@ export default function ArriendosSearch() {
                   projects={mapProjects}
                   selectedId={selectedId}
                   onSelect={id => setSelectedId(id === selectedId ? null : id)}
-                  onCenterChange={(lat, lng) => { mapCenterRef.current = { lat, lng } }}
+                  onBoundsChange={b => { boundsRef.current = b }}
                 />
                 {/* Botón flotante "Buscar en esta zona" */}
                 <button

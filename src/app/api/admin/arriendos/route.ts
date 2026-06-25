@@ -83,11 +83,10 @@ function parseResult(r: any, globalIndex: number) {
   const commune = r.comuna ?? null
   const coords  = commune ? COMUNA_COORDS[commune] : null
   const id      = r.idProperty ?? globalIndex
-  // Spread across ~4km radius using golden-angle spiral for uniform distribution
-  const angle   = globalIndex * 2.399963 // golden angle in radians
-  const radius  = 0.015 + seededRandom(id * 7) * 0.025
-  const offsetLat = Math.cos(angle) * radius
-  const offsetLng = Math.sin(angle) * radius
+  // Uniform square distribution across commune (~4km spread)
+  const SPREAD = 0.035
+  const hashLat = seededRandom(id * 7 + 3) - 0.5
+  const hashLng = seededRandom(id * 13 + 7) - 0.5
 
   return {
     id:        String(id),
@@ -100,8 +99,8 @@ function parseResult(r: any, globalIndex: number) {
     area:      parseInt(r.superficie?.[0] ?? '') || null,
     bedrooms:  parseInt(r.dormitorios?.[0] ?? '') || null,
     bathrooms: parseInt(r.bannos?.[0] ?? '') || null,
-    lat:       coords ? coords[0] + offsetLat : null,
-    lng:       coords ? coords[1] + offsetLng : null,
+    lat:       coords ? coords[0] + hashLat * SPREAD : null,
+    lng:       coords ? coords[1] + hashLng * SPREAD : null,
   }
 }
 

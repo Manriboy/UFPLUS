@@ -21,7 +21,7 @@ interface ProjectMapProps {
   projects: MapProject[]
   selectedId: string | null
   onSelect: (id: string | null) => void
-  onCenterChange?: (lat: number, lng: number) => void
+  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; centerLat: number; centerLng: number }) => void
 }
 
 const PIN_DEFAULT = '#4B4B4B'
@@ -59,7 +59,7 @@ function loadLeafletCSS(): Promise<void> {
   })
 }
 
-export default function ProjectMap({ projects, selectedId, onSelect, onCenterChange }: ProjectMapProps) {
+export default function ProjectMap({ projects, selectedId, onSelect, onBoundsChange }: ProjectMapProps) {
   const outerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LMap | null>(null)
@@ -67,7 +67,7 @@ export default function ProjectMap({ projects, selectedId, onSelect, onCenterCha
   const metroMarkersRef = useRef<LCircleMarker[]>([])
   const metroLinesRef = useRef<import('leaflet').Polyline[]>([])
   const onSelectRef = useRef(onSelect)
-  const onCenterChangeRef = useRef(onCenterChange)
+  const onBoundsChangeRef = useRef(onBoundsChange)
   const wheelCleanupRef = useRef<(() => void) | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -77,7 +77,7 @@ export default function ProjectMap({ projects, selectedId, onSelect, onCenterCha
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   onSelectRef.current = onSelect
-  onCenterChangeRef.current = onCenterChange
+  onBoundsChangeRef.current = onBoundsChange
 
   // Líneas implican estaciones
   const toggleLines = () => {
@@ -141,10 +141,17 @@ export default function ProjectMap({ projects, selectedId, onSelect, onCenterCha
 
       mapRef.current = map
 
-      map.on('moveend', () => {
+      const emitBounds = () => {
+        const b = map.getBounds()
         const c = map.getCenter()
-        onCenterChangeRef.current?.(c.lat, c.lng)
-      })
+        onBoundsChangeRef.current?.({
+          north: b.getNorth(), south: b.getSouth(),
+          east: b.getEast(), west: b.getWest(),
+          centerLat: c.lat, centerLng: c.lng,
+        })
+      }
+      map.on('moveend', emitBounds)
+      map.on('zoomend', emitBounds)
 
       const el = containerRef.current!
       const onWheel = (e: WheelEvent) => {
