@@ -1,12 +1,9 @@
 'use client'
-import React, { useState, useCallback, useMemo } from 'react'
-import dynamic from 'next/dynamic'
+import React, { useState, useCallback, useRef } from 'react'
 import {
-  Search, MapPin, ExternalLink, Map, BedDouble, Bath,
+  Search, MapPin, ExternalLink, BedDouble, Bath,
   Maximize2, ChevronLeft, ChevronRight, AlertCircle, Loader2,
-  KeyRound, Settings,
 } from 'lucide-react'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 // ── HERE Autocomplete ─────────────────────────────────────────────────────────
@@ -23,7 +20,7 @@ function ZonaAutocomplete({ value, onChange, onSearch }: {
 }) {
   const [suggestions, setSuggestions] = useState<HereSuggestion[]>([])
   const [loading, setLoading] = useState(false)
-  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const apiKey = process.env.NEXT_PUBLIC_HERE_API_KEY
 
   const fetchSuggestions = useCallback(async (q: string) => {
@@ -63,7 +60,7 @@ function ZonaAutocomplete({ value, onChange, onSearch }: {
           value={value}
           onChange={e => handleInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ej: Providencia, Las Condes..."
+          placeholder="Ej: Providencia, Las Condes, Santiago..."
           className="input-field pl-9 w-full text-sm"
         />
         {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-gray-400" />}
@@ -87,8 +84,6 @@ function ZonaAutocomplete({ value, onChange, onSearch }: {
   )
 }
 
-const ProjectMap = dynamic(() => import('./ProjectMap'), { ssr: false })
-
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Listing = {
   id:        string
@@ -101,43 +96,11 @@ type Listing = {
   bedrooms:  number | null
   bathrooms: number | null
   area:      number | null
-  lat:       number | null
-  lng:       number | null
 }
-
-type SearchState = {
-  zona:        string
-  dormitorios: number
-  banos:       number
-  precioMinUF: number
-  precioMaxUF: number
-  superfMin:   number
-  superfMax:   number
-}
-
-// ── Constantes ────────────────────────────────────────────────────────────────
-const PAGE_SIZE       = 20
-const UF_MAX          = 150
-const UF_STEP         = 1
-const SUPERF_MAX      = 300
-const SUPERF_STEP     = 5
-
-const DORMITORIOS_OPTIONS = [
-  { value: 0, label: 'Todos' },
-  { value: 1, label: '1+' },
-  { value: 2, label: '2+' },
-  { value: 3, label: '3+' },
-  { value: 4, label: '4+' },
-]
-
-const BANOS_OPTIONS = [
-  { value: 0, label: 'Todos' },
-  { value: 1, label: '1+' },
-  { value: 2, label: '2+' },
-  { value: 3, label: '3+' },
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 20
+
 function fmtUF(v: number | null) {
   if (!v) return null
   return `UF ${v.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
@@ -148,65 +111,9 @@ function fmtCLP(v: number | null) {
   return v.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 })
 }
 
-function fmtArea(m2: number | null) {
-  if (!m2) return null
-  return `${Math.round(m2)} m²`
-}
-
-// ── DualRangeSlider genérico ──────────────────────────────────────────────────
-function DualRangeSlider({ values, max, step, format, onChange }: {
-  values:   [number, number]
-  max:      number
-  step:     number
-  format:   (v: number, isMax?: boolean) => string
-  onChange: (v: [number, number]) => void
-}) {
-  const [minVal, maxVal] = values
-  const minPct = (minVal / max) * 100
-  const maxPct = (maxVal / max) * 100
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs text-gray-500">
-        <span>{minVal === 0 ? 'Sin mín.' : format(minVal)}</span>
-        <span>{maxVal === max ? 'Sin máx.' : format(maxVal, true)}</span>
-      </div>
-      <div className="relative h-6 flex items-center select-none">
-        <div className="absolute w-full h-1.5 bg-gray-200 rounded-full" />
-        <div
-          className="absolute h-1.5 bg-brand-primary rounded-full pointer-events-none"
-          style={{ left: `${minPct}%`, width: `${maxPct - minPct}%` }}
-        />
-        <input type="range" min={0} max={max} step={step} value={minVal}
-          onChange={e => onChange([Math.min(Number(e.target.value), maxVal - step), maxVal])}
-          className="absolute w-full h-1.5 appearance-none bg-transparent cursor-pointer
-            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:pointer-events-auto
-            [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-            [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2
-            [&::-webkit-slider-thumb]:border-brand-primary [&::-webkit-slider-thumb]:rounded-full
-            [&::-webkit-slider-thumb]:shadow-md"
-          style={{ zIndex: minVal > max - 2 * step ? 5 : 3, pointerEvents: 'none' }}
-        />
-        <input type="range" min={0} max={max} step={step} value={maxVal}
-          onChange={e => onChange([minVal, Math.max(Number(e.target.value), minVal + step)])}
-          className="absolute w-full h-1.5 appearance-none bg-transparent cursor-pointer
-            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:pointer-events-auto
-            [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-            [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2
-            [&::-webkit-slider-thumb]:border-brand-primary [&::-webkit-slider-thumb]:rounded-full
-            [&::-webkit-slider-thumb]:shadow-md"
-          style={{ zIndex: 4, pointerEvents: 'none' }}
-        />
-      </div>
-    </div>
-  )
-}
-
 // ── ListingCard ───────────────────────────────────────────────────────────────
 function ListingCard({ listing, selected, onClick }: {
-  listing:  Listing
-  selected: boolean
-  onClick:  () => void
+  listing: Listing; selected: boolean; onClick: () => void
 }) {
   return (
     <div
@@ -239,12 +146,9 @@ function ListingCard({ listing, selected, onClick }: {
 
         <div>
           {listing.priceUF != null && (
-            <p className="text-base font-bold text-brand-primary">{fmtUF(listing.priceUF)}<span className="text-xs font-normal">/mes</span></p>
+            <p className="text-base font-bold text-brand-primary">{fmtUF(listing.priceUF)}<span className="text-xs font-normal text-gray-400">/mes</span></p>
           )}
-          {listing.priceCLP != null && listing.priceUF == null && (
-            <p className="text-base font-bold text-brand-primary">{fmtCLP(listing.priceCLP)}<span className="text-xs font-normal">/mes</span></p>
-          )}
-          {listing.priceUF != null && listing.priceCLP != null && (
+          {listing.priceCLP != null && (
             <p className="text-xs text-gray-400">{fmtCLP(listing.priceCLP)}/mes</p>
           )}
         </div>
@@ -252,7 +156,7 @@ function ListingCard({ listing, selected, onClick }: {
         <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-auto pt-1">
           {listing.bedrooms  != null && <span className="flex items-center gap-1"><BedDouble className="h-3.5 w-3.5" />{listing.bedrooms} dorm.</span>}
           {listing.bathrooms != null && <span className="flex items-center gap-1"><Bath className="h-3.5 w-3.5" />{listing.bathrooms} baño{listing.bathrooms !== 1 ? 's' : ''}</span>}
-          {listing.area      != null && <span className="flex items-center gap-1"><Maximize2 className="h-3 w-3" />{fmtArea(listing.area)}</span>}
+          {listing.area      != null && <span className="flex items-center gap-1"><Maximize2 className="h-3 w-3" />{listing.area} m²</span>}
         </div>
 
         {listing.permalink && (
@@ -270,58 +174,33 @@ function ListingCard({ listing, selected, onClick }: {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ArriendosSearch() {
-  const INITIAL: SearchState = {
-    zona: '', dormitorios: 0, banos: 0,
-    precioMinUF: 0, precioMaxUF: UF_MAX,
-    superfMin: 0, superfMax: SUPERF_MAX,
-  }
-
-  const [filters,        setFilters]        = useState<SearchState>(INITIAL)
-  const [pendingFilters, setPendingFilters] = useState<SearchState>(INITIAL)
-  const [results,        setResults]        = useState<Listing[]>([])
-  const [total,          setTotal]          = useState(0)
-  const [page,           setPage]           = useState(1)
-  const [loading,        setLoading]        = useState(false)
-  const [searched,       setSearched]       = useState(false)
-  const [error,          setError]          = useState<string | null>(null)
-  const [notConnected,   setNotConnected]   = useState(false)
-  const [tokenExpired,   setTokenExpired]   = useState(false)
-  const [showMap,        setShowMap]        = useState(true)
-  const [selectedId,     setSelectedId]     = useState<string | null>(null)
+  const [zona,       setZona]       = useState('')
+  const [results,    setResults]    = useState<Listing[]>([])
+  const [total,      setTotal]      = useState(0)
+  const [page,       setPage]       = useState(1)
+  const [loading,    setLoading]    = useState(false)
+  const [searched,   setSearched]   = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
+  const [comunaMatch, setComunaMatch] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [activeZona, setActiveZona] = useState('')
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
-  const runSearch = useCallback(async (f: SearchState, p: number) => {
+  const runSearch = useCallback(async (z: string, p: number) => {
     setLoading(true)
     setError(null)
-    setNotConnected(false)
-    setTokenExpired(false)
     try {
-      const params = new URLSearchParams({ zona: f.zona, page: String(p) })
-      if (f.dormitorios > 0) params.set('dormitorios', String(f.dormitorios))
-      if (f.banos       > 0) params.set('banos',       String(f.banos))
-      if (f.precioMinUF > 0) params.set('precioMinUF', String(f.precioMinUF))
-      if (f.precioMaxUF < UF_MAX) params.set('precioMaxUF', String(f.precioMaxUF))
-      if (f.superfMin   > 0) params.set('superfMin',   String(f.superfMin))
-      if (f.superfMax   < SUPERF_MAX) params.set('superfMax', String(f.superfMax))
-
+      const params = new URLSearchParams({ zona: z, page: String(p) })
       const res = await fetch(`/api/admin/arriendos?${params}`)
-
-      if (res.status === 403) { setNotConnected(true); return }
-      if (res.status === 401) {
-        const data = await res.json().catch(() => ({}))
-        if (data.error === 'token_expired') { setTokenExpired(true); return }
-        setNotConnected(true)
-        return
-      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail ?? data.error ?? `Error ${res.status}`)
       }
-
       const data = await res.json()
       setResults(data.results ?? [])
       setTotal(data.total ?? 0)
+      setComunaMatch(data.comunaMatch ?? null)
       setSearched(true)
     } catch (e: any) {
       setError(e.message ?? 'Error de conexión')
@@ -333,95 +212,33 @@ export default function ArriendosSearch() {
   }, [])
 
   const handleSearch = () => {
-    setFilters(pendingFilters)
+    setActiveZona(zona)
     setPage(1)
     setSelectedId(null)
-    runSearch(pendingFilters, 1)
+    runSearch(zona, 1)
   }
 
   const handlePage = (newPage: number) => {
     setPage(newPage)
     setSelectedId(null)
-    runSearch(filters, newPage)
+    runSearch(activeZona, newPage)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const mapProjects = useMemo(() =>
-    results
-      .filter(r => r.lat && r.lng)
-      .map(r => ({ id: r.id, title: r.title ?? r.id, lat: r.lat!, lng: r.lng!, source: 'toctoc' })),
-    [results]
-  )
-
   return (
     <div className="flex flex-col gap-0">
-      {/* ── Barra de filtros ─────────────────────────────────────────────────── */}
+      {/* ── Barra de búsqueda ────────────────────────────────────────────── */}
       <div className="px-6 py-4 bg-white border-b border-gray-200">
-        <div className="flex flex-col lg:flex-row gap-3">
-          {/* Zona */}
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 min-w-0">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Zona / Comuna</label>
-            <ZonaAutocomplete
-              value={pendingFilters.zona}
-              onChange={v => setPendingFilters(p => ({ ...p, zona: v }))}
-              onSearch={handleSearch}
-            />
+            <label className="block text-xs font-medium text-gray-600 mb-1">Comuna</label>
+            <ZonaAutocomplete value={zona} onChange={setZona} onSearch={handleSearch} />
           </div>
-
-          {/* Dormitorios */}
-          <div className="w-full lg:w-36">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Dormitorios</label>
-            <select
-              value={pendingFilters.dormitorios}
-              onChange={e => setPendingFilters(p => ({ ...p, dormitorios: Number(e.target.value) }))}
-              className="input-field w-full text-sm"
-            >
-              {DORMITORIOS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-
-          {/* Baños */}
-          <div className="w-full lg:w-32">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Baños</label>
-            <select
-              value={pendingFilters.banos}
-              onChange={e => setPendingFilters(p => ({ ...p, banos: Number(e.target.value) }))}
-              className="input-field w-full text-sm"
-            >
-              {BANOS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-
-          {/* Precio UF */}
-          <div className="w-full lg:w-56">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Precio mensual (UF)</label>
-            <DualRangeSlider
-              values={[pendingFilters.precioMinUF, pendingFilters.precioMaxUF]}
-              max={UF_MAX}
-              step={UF_STEP}
-              format={(v, isMax) => isMax ? `UF ${v}` : `UF ${v}`}
-              onChange={([min, max]) => setPendingFilters(p => ({ ...p, precioMinUF: min, precioMaxUF: max }))}
-            />
-          </div>
-
-          {/* Superficie */}
-          <div className="w-full lg:w-56">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Superficie útil (m²)</label>
-            <DualRangeSlider
-              values={[pendingFilters.superfMin, pendingFilters.superfMax]}
-              max={SUPERF_MAX}
-              step={SUPERF_STEP}
-              format={v => `${v} m²`}
-              onChange={([min, max]) => setPendingFilters(p => ({ ...p, superfMin: min, superfMax: max }))}
-            />
-          </div>
-
-          {/* Botón */}
           <div className="flex items-end">
             <button
               onClick={handleSearch}
               disabled={loading}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap h-[42px]"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap h-[42px]"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               Buscar
@@ -430,41 +247,16 @@ export default function ArriendosSearch() {
         </div>
       </div>
 
-      {/* ── Token no configurado / expirado ─────────────────────────────────── */}
-      {(notConnected || tokenExpired) && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
-          <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center">
-            <KeyRound className="h-7 w-7 text-amber-500" />
-          </div>
-          <div>
-            <p className="font-semibold text-brand-text">
-              {tokenExpired ? 'Token de TocToc expirado' : 'TocToc no configurado'}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              {tokenExpired
-                ? 'El x-access-token venció. Actualízalo en la configuración (tarda menos de 1 minuto).'
-                : 'Configura los tokens de TocToc para habilitar el buscador de arriendos.'}
-            </p>
-          </div>
-          <Link
-            href="/admin/arriendos/toctoc"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dark transition-colors"
-          >
-            <Settings className="h-4 w-4" /> Configurar TocToc
-          </Link>
-        </div>
-      )}
-
-      {/* ── Estado inicial ───────────────────────────────────────────────────── */}
-      {!notConnected && !tokenExpired && !searched && !loading && (
+      {/* ── Estado inicial ───────────────────────────────────────────────── */}
+      {!searched && !loading && (
         <div className="flex flex-col items-center justify-center py-24 text-gray-400">
           <Search className="h-10 w-10 mb-3 opacity-30" />
-          <p className="text-sm font-medium">Ingresa una zona y presiona Buscar</p>
-          <p className="text-xs mt-1 opacity-70">Los resultados se obtienen en tiempo real desde TocToc</p>
+          <p className="text-sm font-medium">Ingresa una comuna y presiona Buscar</p>
+          <p className="text-xs mt-1 opacity-70">Arriendos de departamentos en Región Metropolitana vía TocToc</p>
         </div>
       )}
 
-      {/* ── Error ────────────────────────────────────────────────────────────── */}
+      {/* ── Error ────────────────────────────────────────────────────────── */}
       {error && (
         <div className="mx-6 mt-4 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
@@ -475,39 +267,22 @@ export default function ArriendosSearch() {
         </div>
       )}
 
-      {/* ── Resultados + mapa ────────────────────────────────────────────────── */}
-      {!notConnected && !tokenExpired && searched && !error && (
+      {/* ── Resultados ───────────────────────────────────────────────────── */}
+      {searched && !error && (
         <>
           <div className="px-6 py-3 flex items-center justify-between border-b border-gray-100 bg-gray-50/50">
             <p className="text-sm text-gray-600">
               {loading ? (
                 <span className="flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando...</span>
               ) : (
-                <><span className="font-semibold text-brand-text">{total.toLocaleString('es-CL')}</span> departamentos encontrados</>
+                <>
+                  <span className="font-semibold text-brand-text">{total.toLocaleString('es-CL')}</span> departamentos
+                  {comunaMatch && <span className="text-gray-400"> en {comunaMatch}</span>}
+                  {!comunaMatch && activeZona && <span className="text-gray-400"> en Región Metropolitana</span>}
+                </>
               )}
             </p>
-            {mapProjects.length > 0 && (
-              <button
-                onClick={() => setShowMap(v => !v)}
-                className="flex items-center gap-1.5 text-xs text-brand-primary hover:underline"
-              >
-                <Map className="h-3.5 w-3.5" />
-                {showMap ? 'Ocultar mapa' : 'Ver mapa'}
-              </button>
-            )}
           </div>
-
-          {showMap && mapProjects.length > 0 && (
-            <div className="px-6 pt-4 pb-2">
-              <div className="rounded-lg overflow-hidden border border-gray-200 h-72">
-                <ProjectMap
-                  projects={mapProjects}
-                  selectedId={selectedId}
-                  onSelect={id => setSelectedId(id === selectedId ? null : id)}
-                />
-              </div>
-            </div>
-          )}
 
           {results.length > 0 ? (
             <div className="px-6 py-4">
@@ -547,7 +322,7 @@ export default function ArriendosSearch() {
           ) : !loading && (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <MapPin className="h-8 w-8 mb-2 opacity-30" />
-              <p className="text-sm">No se encontraron departamentos con esos filtros</p>
+              <p className="text-sm">No se encontraron departamentos en esa comuna</p>
             </div>
           )}
         </>

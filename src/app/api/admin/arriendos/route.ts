@@ -1,27 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-const TT_API   = 'https://www.toctoc.com/api/mapa/GetProps'
-const PAGE_SIZE = 20
+const TT_SEO = 'https://www.toctoc.com/gw-lista-seo/propiedades'
 
-function parseTtProp(row: any[]) {
+// Mapeo comunas RM → ID TocToc
+const COMUNAS: Record<string, number> = {
+  'Alhué':301,'Buin':309,'Calera de Tango':307,'Cerrillos':321,'Cerro Navia':318,
+  'Conchalí':326,'El Bosque':333,'El Monte':303,'Estación Central':338,'Huechuraba':327,
+  'Independencia':324,'Isla de Maipo':305,'La Cisterna':330,'La Florida':316,'La Granja':332,
+  'La Pintana':334,'La Reina':314,'Las Condes':313,'Lo Barnechea':311,'Lo Espejo':328,
+  'Lo Prado':319,'Macul':342,'Maipú':320,'Padre Hurtado':306,'Paine':310,
+  'Pedro Aguirre Cerda':329,'Peñaflor':302,'Peñalolén':315,'Providencia':337,'Pudahuel':317,
+  'Quilicura':323,'Quinta Normal':336,'Recoleta':325,'Renca':322,'San Bernardo':308,
+  'San Joaquín':341,'San Miguel':335,'San Pedro':300,'San Ramón':331,'Santiago':339,
+  'Talagante':304,'Valle Grande':345,'Vitacura':312,'Ñuñoa':340,
+}
+
+function findComunaId(input: string): { id: number; label: string } | null {
+  if (!input) return null
+  const normalized = input.trim()
+  if (COMUNAS[normalized]) return { id: COMUNAS[normalized], label: normalized }
+  const lower = normalized.toLowerCase()
+  for (const [name, id] of Object.entries(COMUNAS)) {
+    if (name.toLowerCase() === lower) return { id, label: name }
+  }
+  for (const [name, id] of Object.entries(COMUNAS)) {
+    if (name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase())) {
+      return { id, label: name }
+    }
+  }
+  return null
+}
+
+function buildFilters(comunaId: number | null, comunaLabel: string | null) {
+  const filters: any[] = [
+    { id: 'tipo-de-busqueda', type: 'radio', values: [{ id: 2, label: 'Arrendar', value: [3] }], selected: false, switch: false, buttons: [], mainFilter: true },
+    { id: 'tipo-de-propiedad', type: 'check', values: [{ id: 2, label: 'Departamento', value: [2] }], selected: false, switch: false, buttons: [], mainFilter: true },
+    { id: 'region', type: 'select', values: [{ id: 13, label: 'Metropolitana', value: [13] }], selected: false, switch: false, buttons: [] },
+  ]
+  if (comunaId && comunaLabel) {
+    filters.push({ id: 'comuna', type: 'select', values: [{ id: comunaId, label: comunaLabel, value: [comunaId] }], selected: false, switch: false, buttons: [] })
+  }
+  return filters
+}
+
+function parsePrice(precios: any[]): { uf: number | null; clp: number | null } {
+  let uf: number | null = null
+  let clp: number | null = null
+  for (const p of precios ?? []) {
+    const raw = String(p.value ?? '').replace(/\./g, '').replace(',', '.')
+    const num = parseFloat(raw)
+    if (isNaN(num)) continue
+    if (p.prefix === 'UF') uf = num
+    else if (p.prefix === '$') clp = num
+  }
+  return { uf, clp }
+}
+
+function parseResult(r: any) {
+  const { uf, clp } = parsePrice(r.precios)
   return {
-    id:        String(row[1] ?? ''),
-    lng:       typeof row[2]  === 'number' ? row[2]  : null,
-    lat:       typeof row[3]  === 'number' ? row[3]  : null,
-    bedrooms:  typeof row[4]  === 'number' ? row[4]  : null,
-    commune:   typeof row[7]  === 'string' ? row[7]  : null,
-    bathrooms: typeof row[8]  === 'number' ? row[8]  : null,
-    thumbnail: typeof row[20] === 'string' ? row[20] : null,
-    area:      typeof row[21] === 'number' ? row[21] : null,
-    priceCLP:  typeof row[22] === 'number' ? row[22] : null,
-    priceUF:   typeof row[24] === 'number' ? row[24] : null,
-    title:     typeof row[39] === 'string' ? row[39] : null,
-    permalink: typeof row[40] === 'string' ? row[40] : null,
+    id:        String(r.idProperty ?? ''),
+    title:     r.titulo ?? null,
+    commune:   r.comuna ?? null,
+    thumbnail: r.imagenPrincipal?.src ?? null,
+    permalink: r.urlFicha ?? null,
+    priceUF:   uf,
+    priceCLP:  clp,
+    area:      parseInt(r.superficie?.[0] ?? '') || null,
+    bedrooms:  parseInt(r.dormitorios?.[0] ?? '') || null,
+    bathrooms: parseInt(r.bannos?.[0] ?? '') || null,
+    lat:       null,
+    lng:       null,
   }
 }
 
@@ -29,138 +82,43 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const sp             = req.nextUrl.searchParams
-  const busqueda       = sp.get('zona')?.trim()      ?? ''
-  const dormitorios    = parseInt(sp.get('dormitorios')  ?? '0') || 0
-  const banos          = parseInt(sp.get('banos')        ?? '0') || 0
-  const precioDesdeUF  = parseFloat(sp.get('precioMinUF') ?? '0') || 0
-  const precioHastaUF  = parseFloat(sp.get('precioMaxUF') ?? '0') || 0
-  const superfMin      = parseInt(sp.get('superfMin')    ?? '0') || 0
-  const superfMax      = parseInt(sp.get('superfMax')    ?? '0') || 0
-  const ordenarPor     = parseInt(sp.get('orden')        ?? '0') || 0
-  const page           = Math.max(1, parseInt(sp.get('page') ?? '1') || 1)
+  const sp   = req.nextUrl.searchParams
+  const zona = sp.get('zona')?.trim() ?? ''
+  const page = Math.max(1, parseInt(sp.get('page') ?? '1') || 1)
 
-  const [gAuthRow, accessRow] = await Promise.all([
-    prisma.setting.findUnique({ where: { key: 'tt_jwt_gauth'    } }),
-    prisma.setting.findUnique({ where: { key: 'tt_access_token' } }),
-  ])
+  const match = findComunaId(zona)
+  const filters = buildFilters(match?.id ?? null, match?.label ?? null)
+  const encoded = encodeURIComponent(JSON.stringify(filters))
+  const url = `${TT_SEO}?filtros=${encoded}&order=1&page=${page}`
 
-  if (!gAuthRow?.value || !accessRow?.value) {
-    return NextResponse.json({ error: 'not_connected' }, { status: 403 })
-  }
-
-  const body = {
-    region: '', comuna: '', barrio: '', poi: '',
-    tipoVista:               'lista',
-    operacion:               2,
-    idPoligono:              0,
-    moneda:                  2,
-    precioDesde:             precioDesdeUF,
-    precioHasta:             precioHastaUF,
-    dormitoriosDesde:        dormitorios,
-    dormitoriosHasta:        0,
-    banosDesde:              banos,
-    banosHasta:              0,
-    tipoPropiedad:           'departamento',
-    estado:                  0,
-    disponibilidadEntrega:   '',
-    numeroDeDiasTocToc:      0,
-    superficieDesdeUtil:     superfMin,
-    superficieHastaUtil:     superfMax,
-    superficieDesdeConstruida: 0,
-    superficieHastaConstruida: 0,
-    superficieDesdeTerraza:  0,
-    superficieHastaTerraza:  0,
-    superficieDesdeTerreno:  0,
-    superficieHastaTerreno:  0,
-    ordenarPor,
-    pagina:                  page,
-    paginaInterna:           1,
-    zoom:                    15,
-    idZonaHomogenea:         0,
-    busqueda,
-    viewport:                '',
-    atributos:               [],
-    publicador:              0,
-    temporalidad:            0,
-    limite:                  PAGE_SIZE,
-    cargaBanner:             false,
-    primeraCarga:            false,
-    santander:               false,
-  }
-
-  // 1. Fetch
-  let res: Response
   try {
-    res = await fetch(TT_API, {
-      method: 'POST',
+    const res = await fetch(url, {
       headers: {
-        'Accept':          'application/json',
-        'Content-Type':    'application/json',
-        'x-access-token':  accessRow.value,
-        'Cookie':          `tt-jwt-gauth=${gAuthRow.value}`,
+        'Accept':     '*/*',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        'Cookie':     'X-DATA=a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       },
-      body: JSON.stringify(body),
       cache: 'no-store',
     })
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
-    const cause = e instanceof Error && e.cause ? String(e.cause) : ''
-    console.error('[arriendos/tt] fetch threw:', msg, cause)
-    return NextResponse.json({ error: 'fetch_error', detail: `${msg}${cause ? ` | cause: ${cause}` : ''}` }, { status: 500 })
-  }
 
-  // 2. Dump response headers for debugging
-  const resHeaders: Record<string, string> = {}
-  res.headers.forEach((v, k) => { resHeaders[k] = v })
-  const ct = resHeaders['content-type'] ?? '(none)'
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return NextResponse.json({ error: 'tt_error', detail: `HTTP ${res.status}: ${text.slice(0, 200)}` }, { status: 502 })
+    }
 
-  // Read body — try arrayBuffer first for reliability
-  let rawText = ''
-  try {
-    const buf = await res.arrayBuffer()
-    rawText = new TextDecoder().decode(buf)
-  } catch {
-    rawText = ''
-  }
-
-  // Diagnostic mode: if not 200, return full debug info
-  if (res.status === 401 || res.status === 403) {
-    return NextResponse.json({ error: 'token_expired', detail: `HTTP ${res.status} | ${ct}`, headers: resHeaders }, { status: 401 })
-  }
-
-  if (!res.ok || !rawText || !ct.includes('json')) {
-    return NextResponse.json({
-      error: 'tt_error',
-      detail: `HTTP ${res.status} | ct: ${ct} | body(${rawText.length}): ${rawText.slice(0, 300)}`,
-      headers: resHeaders,
-    }, { status: 502 })
-  }
-
-  // 3. Parse JSON
-  let data: any
-  try {
-    data = JSON.parse(rawText)
-  } catch {
-    return NextResponse.json({ error: 'parse_error', detail: `HTTP ${res.status} ${ct}: ${rawText.slice(0, 200)}` }, { status: 502 })
-  }
-
-  // 4. Extract results
-  try {
-    const resultados = data.resultados ?? {}
-    const props: any[] = resultados.Propiedades ?? []
-    const total: number = resultados.Total ?? props.length
+    const data = await res.json()
+    const results = (data.results ?? []).map(parseResult)
+    const total   = data.total ?? results.length
 
     return NextResponse.json({
-      results:  props.map(parseTtProp),
+      results,
       total,
-      page,
-      pageSize: PAGE_SIZE,
+      page: data.page ?? page,
+      pageSize: 20,
+      comunaMatch: match?.label ?? null,
     })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
-    const keys = Object.keys(data ?? {}).join(', ')
-    console.error('[arriendos/tt] data error:', msg, 'top keys:', keys)
-    return NextResponse.json({ error: 'data_error', detail: `${msg} | keys: ${keys}` }, { status: 500 })
+    return NextResponse.json({ error: 'fetch_error', detail: msg }, { status: 500 })
   }
 }
