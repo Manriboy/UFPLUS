@@ -172,19 +172,31 @@ function fmtCLP(v: number | null) {
   return v.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 })
 }
 
-const DORM_OPTIONS = [
-  { value: 0, label: 'Todos' },
-  { value: 1, label: '1+' },
-  { value: 2, label: '2+' },
-  { value: 3, label: '3+' },
-  { value: 4, label: '4+' },
-]
-const BANO_OPTIONS = [
-  { value: 0, label: 'Todos' },
-  { value: 1, label: '1+' },
-  { value: 2, label: '2+' },
-  { value: 3, label: '3+' },
-]
+const DORM_VALUES = [1, 2, 3, 4, 5]
+const BANO_VALUES = [1, 2, 3]
+
+function ToggleChips({ label, values, selected, onToggle }: {
+  label: string; values: number[]; selected: Set<number>; onToggle: (v: number) => void
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <div className="flex gap-1">
+        {values.map(v => (
+          <button key={v} type="button" onClick={() => onToggle(v)}
+            className={cn(
+              'px-2.5 py-1.5 text-xs font-medium rounded border transition-colors min-w-[32px]',
+              selected.has(v)
+                ? 'bg-brand-primary text-white border-brand-primary'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+            )}>
+            {v}{v === 5 ? '+' : ''}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ── MiniCard ──────────────────────────────────────────────────────────────────
 function MiniCard({ listing, selected, onClick }: { listing: Listing; selected: boolean; onClick: () => void }) {
@@ -270,8 +282,8 @@ export default function ArriendosSearch() {
   const [comunaMatch, setComunaMatch] = useState<string | null>(null)
   const [selectedId, setSelectedId]   = useState<string | null>(null)
   const [view, setView]               = useState<'map' | 'grid'>('map')
-  const [dormFilter, setDormFilter]   = useState(0)
-  const [banoFilter, setBanoFilter]   = useState(0)
+  const [dormFilter, setDormFilter]   = useState<Set<number>>(new Set())
+  const [banoFilter, setBanoFilter]   = useState<Set<number>>(new Set())
   const [visibleBounds, setVisibleBounds] = useState<MapBounds | null>(null)
   const boundsRef = useRef<MapBounds | null>(null)
 
@@ -320,11 +332,25 @@ export default function ArriendosSearch() {
     }
   }
 
-  // Filter: dormitorios + baños + bounds del mapa
+  const toggleDorm = useCallback((v: number) => {
+    setDormFilter(prev => { const next = new Set(prev); next.has(v) ? next.delete(v) : next.add(v); return next })
+  }, [])
+  const toggleBano = useCallback((v: number) => {
+    setBanoFilter(prev => { const next = new Set(prev); next.has(v) ? next.delete(v) : next.add(v); return next })
+  }, [])
+
   const filtered = useMemo(() =>
     allResults.filter(r => {
-      if (dormFilter > 0 && (r.bedrooms == null || r.bedrooms < dormFilter)) return false
-      if (banoFilter > 0 && (r.bathrooms == null || r.bathrooms < banoFilter)) return false
+      if (dormFilter.size > 0) {
+        if (r.bedrooms == null) return false
+        const matchExact = dormFilter.has(r.bedrooms)
+        const match5Plus = dormFilter.has(5) && r.bedrooms >= 5
+        if (!matchExact && !match5Plus) return false
+      }
+      if (banoFilter.size > 0) {
+        if (r.bathrooms == null) return false
+        if (!banoFilter.has(r.bathrooms) && !(banoFilter.has(3) && r.bathrooms >= 3)) return false
+      }
       if (visibleBounds && r.lat != null && r.lng != null) {
         if (r.lat < visibleBounds.south || r.lat > visibleBounds.north) return false
         if (r.lng < visibleBounds.west  || r.lng > visibleBounds.east)  return false
@@ -377,21 +403,8 @@ export default function ArriendosSearch() {
             <ZonaAutocomplete value={zona} onChange={setZona} onSearch={handleSearch} />
           </div>
 
-          <div className="w-full lg:w-32">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Dormitorios</label>
-            <select value={dormFilter} onChange={e => setDormFilter(Number(e.target.value))}
-              className="input-field w-full text-sm">
-              {DORM_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-
-          <div className="w-full lg:w-28">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Baños</label>
-            <select value={banoFilter} onChange={e => setBanoFilter(Number(e.target.value))}
-              className="input-field w-full text-sm">
-              {BANO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
+          <ToggleChips label="Dormitorios" values={DORM_VALUES} selected={dormFilter} onToggle={toggleDorm} />
+          <ToggleChips label="Baños" values={BANO_VALUES} selected={banoFilter} onToggle={toggleBano} />
 
           <div className="flex items-end gap-2">
             <button onClick={handleSearch} disabled={loading}
