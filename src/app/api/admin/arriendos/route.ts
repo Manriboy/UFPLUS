@@ -45,6 +45,25 @@ function buildFilters(comunaId: number | null, comunaLabel: string | null) {
   return filters
 }
 
+// Coordenadas centrales de comunas RM (lat, lng)
+const COMUNA_COORDS: Record<string, [number, number]> = {
+  'Alhué':[-34.028,-71.106],'Buin':[-33.733,-70.742],'Calera de Tango':[-33.637,-70.718],
+  'Cerrillos':[-33.494,-70.714],'Cerro Navia':[-33.428,-70.733],'Conchalí':[-33.384,-70.649],
+  'El Bosque':[-33.564,-70.670],'El Monte':[-33.683,-71.019],'Estación Central':[-33.467,-70.682],
+  'Huechuraba':[-33.365,-70.634],'Independencia':[-33.416,-70.660],'Isla de Maipo':[-33.754,-70.883],
+  'La Cisterna':[-33.530,-70.661],'La Florida':[-33.517,-70.588],'La Granja':[-33.537,-70.622],
+  'La Pintana':[-33.583,-70.636],'La Reina':[-33.441,-70.541],'Las Condes':[-33.408,-70.567],
+  'Lo Barnechea':[-33.352,-70.517],'Lo Espejo':[-33.519,-70.690],'Lo Prado':[-33.444,-70.726],
+  'Macul':[-33.490,-70.599],'Maipú':[-33.509,-70.755],'Padre Hurtado':[-33.573,-70.831],
+  'Paine':[-33.810,-70.740],'Pedro Aguirre Cerda':[-33.497,-70.679],'Peñaflor':[-33.612,-70.885],
+  'Peñalolén':[-33.490,-70.528],'Providencia':[-33.426,-70.611],'Pudahuel':[-33.437,-70.750],
+  'Quilicura':[-33.356,-70.730],'Quinta Normal':[-33.426,-70.699],'Recoleta':[-33.402,-70.640],
+  'Renca':[-33.397,-70.720],'San Bernardo':[-33.593,-70.700],'San Joaquín':[-33.497,-70.632],
+  'San Miguel':[-33.497,-70.652],'San Pedro':[-33.888,-71.459],'San Ramón':[-33.541,-70.644],
+  'Santiago':[-33.449,-70.669],'Talagante':[-33.665,-70.928],'Valle Grande':[-33.606,-70.879],
+  'Vitacura':[-33.393,-70.580],'Ñuñoa':[-33.457,-70.597],
+}
+
 function parsePrice(precios: any[]): { uf: number | null; clp: number | null } {
   let uf: number | null = null
   let clp: number | null = null
@@ -58,12 +77,23 @@ function parsePrice(precios: any[]): { uf: number | null; clp: number | null } {
   return { uf, clp }
 }
 
-function parseResult(r: any) {
+function seededRandom(seed: number) {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
+
+function parseResult(r: any, index: number) {
   const { uf, clp } = parsePrice(r.precios)
+  const commune = r.comuna ?? null
+  const coords  = commune ? COMUNA_COORDS[commune] : null
+  const id      = r.idProperty ?? index
+  const offsetLat = (seededRandom(id * 7) - 0.5) * 0.012
+  const offsetLng = (seededRandom(id * 13) - 0.5) * 0.012
+
   return {
-    id:        String(r.idProperty ?? ''),
+    id:        String(id),
     title:     r.titulo ?? null,
-    commune:   r.comuna ?? null,
+    commune,
     thumbnail: r.imagenPrincipal?.src ?? null,
     permalink: r.urlFicha ?? null,
     priceUF:   uf,
@@ -71,6 +101,8 @@ function parseResult(r: any) {
     area:      parseInt(r.superficie?.[0] ?? '') || null,
     bedrooms:  parseInt(r.dormitorios?.[0] ?? '') || null,
     bathrooms: parseInt(r.bannos?.[0] ?? '') || null,
+    lat:       coords ? coords[0] + offsetLat : null,
+    lng:       coords ? coords[1] + offsetLng : null,
   }
 }
 
@@ -113,7 +145,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      results:     (data.results ?? []).map(parseResult),
+      results:     (data.results ?? []).map((r: any, i: number) => parseResult(r, i)),
       total:       data.total ?? 0,
       page:        data.page ?? page,
       pageSize:    20,
