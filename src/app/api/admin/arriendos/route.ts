@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 
+export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 const TT_SEO = 'https://www.toctoc.com/gw-lista-seo/propiedades'
 
-// Mapeo comunas RM → ID TocToc
 const COMUNAS: Record<string, number> = {
   'Alhué':301,'Buin':309,'Calera de Tango':307,'Cerrillos':321,'Cerro Navia':318,
   'Conchalí':326,'El Bosque':333,'El Monte':303,'Estación Central':338,'Huechuraba':327,
@@ -73,23 +71,18 @@ function parseResult(r: any) {
     area:      parseInt(r.superficie?.[0] ?? '') || null,
     bedrooms:  parseInt(r.dormitorios?.[0] ?? '') || null,
     bathrooms: parseInt(r.bannos?.[0] ?? '') || null,
-    lat:       null,
-    lng:       null,
   }
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-
   const sp   = req.nextUrl.searchParams
   const zona = sp.get('zona')?.trim() ?? ''
   const page = Math.max(1, parseInt(sp.get('page') ?? '1') || 1)
 
-  const match = findComunaId(zona)
+  const match   = findComunaId(zona)
   const filters = buildFilters(match?.id ?? null, match?.label ?? null)
   const encoded = encodeURIComponent(JSON.stringify(filters))
-  const url = `${TT_SEO}?filtros=${encoded}&order=1&page=${page}`
+  const url     = `${TT_SEO}?filtros=${encoded}&order=1&page=${page}`
 
   try {
     const res = await fetch(url, {
@@ -98,34 +91,32 @@ export async function GET(req: NextRequest) {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
         'Cookie':     'X-DATA=a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       },
-      cache: 'no-store',
     })
 
-    const rawText = await res.text().catch(() => '')
+    const rawText = await res.text()
 
-    if (!res.ok) {
-      return NextResponse.json({ error: 'tt_error', detail: `HTTP ${res.status}: ${rawText.slice(0, 200)}` }, { status: 502 })
-    }
-
-    if (!rawText) {
-      return NextResponse.json({ error: 'empty', detail: `HTTP ${res.status} body vacío, ct: ${res.headers.get('content-type')}` }, { status: 502 })
+    if (!res.ok || !rawText) {
+      return NextResponse.json({
+        error: 'tt_error',
+        detail: `HTTP ${res.status} | ct: ${res.headers.get('content-type')} | body(${rawText.length}): ${rawText.slice(0, 200)}`,
+      }, { status: 502 })
     }
 
     let data: any
     try {
       data = JSON.parse(rawText)
     } catch {
-      return NextResponse.json({ error: 'parse_error', detail: `Not JSON (${rawText.length}b): ${rawText.slice(0, 200)}` }, { status: 502 })
+      return NextResponse.json({
+        error: 'parse_error',
+        detail: `Not JSON (${rawText.length}b): ${rawText.slice(0, 200)}`,
+      }, { status: 502 })
     }
 
-    const results = (data.results ?? []).map(parseResult)
-    const total   = data.total ?? results.length
-
     return NextResponse.json({
-      results,
-      total,
-      page: data.page ?? page,
-      pageSize: 20,
+      results:     (data.results ?? []).map(parseResult),
+      total:       data.total ?? 0,
+      page:        data.page ?? page,
+      pageSize:    20,
       comunaMatch: match?.label ?? null,
     })
   } catch (e: unknown) {
