@@ -21,6 +21,7 @@ interface ProjectMapProps {
   projects: MapProject[]
   selectedId: string | null
   onSelect: (id: string | null) => void
+  onCenterChange?: (lat: number, lng: number) => void
 }
 
 const PIN_DEFAULT = '#4B4B4B'
@@ -58,7 +59,7 @@ function loadLeafletCSS(): Promise<void> {
   })
 }
 
-export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMapProps) {
+export default function ProjectMap({ projects, selectedId, onSelect, onCenterChange }: ProjectMapProps) {
   const outerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LMap | null>(null)
@@ -66,6 +67,7 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
   const metroMarkersRef = useRef<LCircleMarker[]>([])
   const metroLinesRef = useRef<import('leaflet').Polyline[]>([])
   const onSelectRef = useRef(onSelect)
+  const onCenterChangeRef = useRef(onCenterChange)
   const wheelCleanupRef = useRef<(() => void) | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -75,6 +77,7 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   onSelectRef.current = onSelect
+  onCenterChangeRef.current = onCenterChange
 
   // Líneas implican estaciones
   const toggleLines = () => {
@@ -137,6 +140,11 @@ export default function ProjectMap({ projects, selectedId, onSelect }: ProjectMa
       ).addTo(map)
 
       mapRef.current = map
+
+      map.on('moveend', () => {
+        const c = map.getCenter()
+        onCenterChangeRef.current?.(c.lat, c.lng)
+      })
 
       const el = containerRef.current!
       const onWheel = (e: WheelEvent) => {
