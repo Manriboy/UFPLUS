@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
-const TT_SEO = 'https://www.toctoc.com/gw-lista-seo/propiedades'
+const TT_SEO     = 'https://www.toctoc.com/gw-lista-seo/propiedades'
+const PER_PAGE   = 20
+const MAX_PAGES  = 40
 
 const COMUNAS: Record<string, number> = {
   'Alhué':301,'Buin':309,'Calera de Tango':307,'Cerrillos':321,'Cerro Navia':318,
@@ -17,35 +19,6 @@ const COMUNAS: Record<string, number> = {
   'Talagante':304,'Valle Grande':345,'Vitacura':312,'Ñuñoa':340,
 }
 
-function findComunaId(input: string): { id: number; label: string } | null {
-  if (!input) return null
-  const normalized = input.trim()
-  if (COMUNAS[normalized]) return { id: COMUNAS[normalized], label: normalized }
-  const lower = normalized.toLowerCase()
-  for (const [name, id] of Object.entries(COMUNAS)) {
-    if (name.toLowerCase() === lower) return { id, label: name }
-  }
-  for (const [name, id] of Object.entries(COMUNAS)) {
-    if (name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase())) {
-      return { id, label: name }
-    }
-  }
-  return null
-}
-
-function buildFilters(comunaId: number | null, comunaLabel: string | null) {
-  const filters: any[] = [
-    { id: 'tipo-de-busqueda', type: 'radio', values: [{ id: 2, label: 'Arrendar', value: [3] }], selected: false, switch: false, buttons: [], mainFilter: true },
-    { id: 'tipo-de-propiedad', type: 'check', values: [{ id: 2, label: 'Departamento', value: [2] }], selected: false, switch: false, buttons: [], mainFilter: true },
-    { id: 'region', type: 'select', values: [{ id: 13, label: 'Metropolitana', value: [13] }], selected: false, switch: false, buttons: [] },
-  ]
-  if (comunaId && comunaLabel) {
-    filters.push({ id: 'comuna', type: 'select', values: [{ id: comunaId, label: comunaLabel, value: [comunaId] }], selected: false, switch: false, buttons: [] })
-  }
-  return filters
-}
-
-// Coordenadas centrales de comunas RM (lat, lng)
 const COMUNA_COORDS: Record<string, [number, number]> = {
   'Alhué':[-34.028,-71.106],'Buin':[-33.733,-70.742],'Calera de Tango':[-33.637,-70.718],
   'Cerrillos':[-33.494,-70.714],'Cerro Navia':[-33.428,-70.733],'Conchalí':[-33.384,-70.649],
@@ -64,9 +37,32 @@ const COMUNA_COORDS: Record<string, [number, number]> = {
   'Vitacura':[-33.393,-70.580],'Ñuñoa':[-33.457,-70.597],
 }
 
+function findComunaId(input: string): { id: number; label: string } | null {
+  if (!input) return null
+  const lower = input.trim().toLowerCase()
+  for (const [name, id] of Object.entries(COMUNAS)) {
+    if (name.toLowerCase() === lower) return { id, label: name }
+  }
+  for (const [name, id] of Object.entries(COMUNAS)) {
+    if (name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase())) return { id, label: name }
+  }
+  return null
+}
+
+function buildFilters(comunaId: number | null, comunaLabel: string | null) {
+  const f: any[] = [
+    { id: 'tipo-de-busqueda', type: 'radio', values: [{ id: 2, label: 'Arrendar', value: [3] }], selected: false, switch: false, buttons: [], mainFilter: true },
+    { id: 'tipo-de-propiedad', type: 'check', values: [{ id: 2, label: 'Departamento', value: [2] }], selected: false, switch: false, buttons: [], mainFilter: true },
+    { id: 'region', type: 'select', values: [{ id: 13, label: 'Metropolitana', value: [13] }], selected: false, switch: false, buttons: [] },
+  ]
+  if (comunaId && comunaLabel) {
+    f.push({ id: 'comuna', type: 'select', values: [{ id: comunaId, label: comunaLabel, value: [comunaId] }], selected: false, switch: false, buttons: [] })
+  }
+  return f
+}
+
 function parsePrice(precios: any[]): { uf: number | null; clp: number | null } {
-  let uf: number | null = null
-  let clp: number | null = null
+  let uf: number | null = null, clp: number | null = null
   for (const p of precios ?? []) {
     const raw = String(p.value ?? '').replace(/\./g, '').replace(',', '.')
     const num = parseFloat(raw)
@@ -82,13 +78,16 @@ function seededRandom(seed: number) {
   return x - Math.floor(x)
 }
 
-function parseResult(r: any, index: number) {
+function parseResult(r: any, globalIndex: number) {
   const { uf, clp } = parsePrice(r.precios)
   const commune = r.comuna ?? null
   const coords  = commune ? COMUNA_COORDS[commune] : null
-  const id      = r.idProperty ?? index
-  const offsetLat = (seededRandom(id * 7) - 0.5) * 0.012
-  const offsetLng = (seededRandom(id * 13) - 0.5) * 0.012
+  const id      = r.idProperty ?? globalIndex
+  // Spread across ~4km radius using golden-angle spiral for uniform distribution
+  const angle   = globalIndex * 2.399963 // golden angle in radians
+  const radius  = 0.015 + seededRandom(id * 7) * 0.025
+  const offsetLat = Math.cos(angle) * radius
+  const offsetLng = Math.sin(angle) * radius
 
   return {
     id:        String(id),
@@ -106,49 +105,62 @@ function parseResult(r: any, index: number) {
   }
 }
 
+const HEADERS = {
+  'Accept':     '*/*',
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+  'Cookie':     'X-DATA=a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+}
+
+async function fetchPage(baseUrl: string, page: number): Promise<any[]> {
+  try {
+    const res = await fetch(`${baseUrl}&page=${page}`, { headers: HEADERS })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.results ?? []
+  } catch { return [] }
+}
+
 export async function GET(req: NextRequest) {
   const sp   = req.nextUrl.searchParams
   const zona = sp.get('zona')?.trim() ?? ''
-  const page = Math.max(1, parseInt(sp.get('page') ?? '1') || 1)
 
   const match   = findComunaId(zona)
   const filters = buildFilters(match?.id ?? null, match?.label ?? null)
   const encoded = encodeURIComponent(JSON.stringify(filters))
-  const url     = `${TT_SEO}?filtros=${encoded}&order=1&page=${page}`
+  const baseUrl = `${TT_SEO}?filtros=${encoded}&order=1`
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        'Accept':     '*/*',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
-        'Cookie':     'X-DATA=a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      },
-    })
+    // 1. Load page 1 to get total
+    const res1 = await fetch(`${baseUrl}&page=1`, { headers: HEADERS })
+    const rawText = await res1.text()
 
-    const rawText = await res.text()
-
-    if (!res.ok || !rawText) {
+    if (!res1.ok || !rawText) {
       return NextResponse.json({
         error: 'tt_error',
-        detail: `HTTP ${res.status} | ct: ${res.headers.get('content-type')} | body(${rawText.length}): ${rawText.slice(0, 200)}`,
+        detail: `HTTP ${res1.status} | ct: ${res1.headers.get('content-type')} | body(${rawText.length}): ${rawText.slice(0, 200)}`,
       }, { status: 502 })
     }
 
-    let data: any
-    try {
-      data = JSON.parse(rawText)
-    } catch {
-      return NextResponse.json({
-        error: 'parse_error',
-        detail: `Not JSON (${rawText.length}b): ${rawText.slice(0, 200)}`,
-      }, { status: 502 })
+    let data1: any
+    try { data1 = JSON.parse(rawText) } catch {
+      return NextResponse.json({ error: 'parse_error', detail: rawText.slice(0, 200) }, { status: 502 })
+    }
+
+    const total     = data1.total ?? 0
+    const page1     = data1.results ?? []
+    const totalPages = Math.min(Math.ceil(total / PER_PAGE), MAX_PAGES)
+
+    // 2. Load remaining pages in parallel
+    let allResults = [...page1]
+    if (totalPages > 1) {
+      const pageNums = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+      const batches  = await Promise.all(pageNums.map(p => fetchPage(baseUrl, p)))
+      for (const batch of batches) allResults.push(...batch)
     }
 
     return NextResponse.json({
-      results:     (data.results ?? []).map((r: any, i: number) => parseResult(r, i)),
-      total:       data.total ?? 0,
-      page:        data.page ?? page,
-      pageSize:    20,
+      results:     allResults.map((r: any, i: number) => parseResult(r, i)),
+      total,
       comunaMatch: match?.label ?? null,
     })
   } catch (e: unknown) {

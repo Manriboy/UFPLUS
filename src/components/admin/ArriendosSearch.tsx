@@ -3,7 +3,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Search, MapPin, ExternalLink, BedDouble, Bath,
-  Maximize2, ChevronLeft, ChevronRight, AlertCircle, Loader2,
+  Maximize2, AlertCircle, Loader2,
   Map, LayoutGrid, RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -109,8 +109,6 @@ type Listing = {
   lat: number | null; lng: number | null
 }
 
-const PAGE_SIZE = 20
-
 function fmtCLP(v: number | null) {
   if (!v) return null
   return v.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 })
@@ -205,7 +203,6 @@ export default function ArriendosSearch() {
   const [zona, setZona]               = useState('')
   const [results, setResults]         = useState<Listing[]>([])
   const [total, setTotal]             = useState(0)
-  const [page, setPage]               = useState(1)
   const [loading, setLoading]         = useState(false)
   const [searched, setSearched]       = useState(false)
   const [error, setError]             = useState<string | null>(null)
@@ -217,13 +214,11 @@ export default function ArriendosSearch() {
   const [banoFilter, setBanoFilter]   = useState(0)
   const mapCenterRef = useRef<{ lat: number; lng: number } | null>(null)
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-
-  const runSearch = useCallback(async (z: string, p: number) => {
+  const runSearch = useCallback(async (z: string) => {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ zona: z, page: String(p) })
+      const params = new URLSearchParams({ zona: z })
       const res = await fetch(`/api/admin/arriendos?${params}`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -244,14 +239,8 @@ export default function ArriendosSearch() {
   }, [])
 
   const handleSearch = () => {
-    setActiveZona(zona); setPage(1); setSelectedId(null)
-    runSearch(zona, 1)
-  }
-
-  const handlePage = (p: number) => {
-    setPage(p); setSelectedId(null)
-    runSearch(activeZona, p)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setActiveZona(zona); setSelectedId(null)
+    runSearch(zona)
   }
 
   const handleSearchInZone = () => {
@@ -260,9 +249,8 @@ export default function ArriendosSearch() {
     const nearest = findNearestComuna(lat, lng)
     setZona(nearest)
     setActiveZona(nearest)
-    setPage(1)
     setSelectedId(null)
-    runSearch(nearest, 1)
+    runSearch(nearest)
   }
 
   // Client-side filter by dormitorios/baños
@@ -404,15 +392,6 @@ export default function ArriendosSearch() {
                       onClick={() => setSelectedId(listing.id === selectedId ? null : listing.id)} />
                   ))}
                 </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 py-3 border-t border-gray-100">
-                    <button onClick={() => handlePage(page - 1)} disabled={page <= 1 || loading}
-                      className="px-2 py-1 text-xs border rounded disabled:opacity-30"><ChevronLeft className="h-3 w-3" /></button>
-                    <span className="text-xs text-gray-500">{page} / {totalPages}</span>
-                    <button onClick={() => handlePage(page + 1)} disabled={page >= totalPages || loading}
-                      className="px-2 py-1 text-xs border rounded disabled:opacity-30"><ChevronRight className="h-3 w-3" /></button>
-                  </div>
-                )}
                 {selectedListing?.permalink && (
                   <div className="p-3 border-t border-gray-100">
                     <a href={selectedListing.permalink} target="_blank" rel="noopener noreferrer"
@@ -454,19 +433,6 @@ export default function ArriendosSearch() {
                     onClick={() => setSelectedId(listing.id === selectedId ? null : listing.id)} />
                 ))}
               </div>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-3 mt-8 pb-4">
-                  <button onClick={() => handlePage(page - 1)} disabled={page <= 1 || loading}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 transition-colors">
-                    <ChevronLeft className="h-4 w-4" /> Anterior
-                  </button>
-                  <span className="text-sm text-gray-600">Página <span className="font-semibold">{page}</span> de <span className="font-semibold">{totalPages}</span></span>
-                  <button onClick={() => handlePage(page + 1)} disabled={page >= totalPages || loading}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 transition-colors">
-                    Siguiente <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
