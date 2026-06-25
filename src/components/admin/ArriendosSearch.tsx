@@ -4,9 +4,10 @@ import dynamic from 'next/dynamic'
 import {
   Search, MapPin, ExternalLink, BedDouble, Bath,
   Maximize2, AlertCircle, Loader2,
-  Map, LayoutGrid, RefreshCw,
+  Map, LayoutGrid, RefreshCw, Train,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { METRO_STATIONS } from '@/lib/santiago-metro'
 
 const ProjectMap = dynamic(() => import('./ProjectMap'), { ssr: false })
 
@@ -39,28 +40,66 @@ function findNearestComuna(lat: number, lng: number): string {
   return best
 }
 
-// ── HERE Autocomplete ─────────────────────────────────────────────────────────
-type HereSuggestion = {
-  id: string; title: string
-  address: { label: string; city?: string; county?: string; state?: string }
+// ── Autocomplete (comunas + barrios + metro) ──────────────────────────────────
+type Suggestion = {
+  id: string
+  label: string
+  sublabel: string
+  type: 'comuna' | 'barrio' | 'metro'
+  value: string // comuna name to search
+}
+
+function searchMetroStations(q: string): Suggestion[] {
+  if (q.length < 2) return []
+  const lower = q.toLowerCase()
+  const seen = new Set<string>()
+  return METRO_STATIONS
+    .filter(s => s.name.toLowerCase().includes(lower))
+    .filter(s => { if (seen.has(s.name)) return false; seen.add(s.name); return true })
+    .slice(0, 4)
+    .map(s => ({
+      id:       `metro-${s.name}-${s.line}`,
+      label:    `Metro ${s.name}`,
+      sublabel: `${s.line} · ${findNearestComuna(s.lat, s.lng)}`,
+      type:     'metro' as const,
+      value:    findNearestComuna(s.lat, s.lng),
+    }))
 }
 
 function ZonaAutocomplete({ value, onChange, onSearch }: {
   value: string; onChange: (v: string) => void; onSearch: () => void
 }) {
-  const [suggestions, setSuggestions] = useState<HereSuggestion[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const apiKey = process.env.NEXT_PUBLIC_HERE_API_KEY
 
   const fetchSuggestions = useCallback(async (q: string) => {
-    if (!q.trim() || !apiKey) return
+    if (!q.trim()) return
     setLoading(true)
     try {
-      const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(q)}&apiKey=${apiKey}&lang=es&limit=5&in=countryCode:CHL&types=city,area`
-      const res = await fetch(url)
-      const json = await res.json()
-      setSuggestions(json.items ?? [])
+      const metroResults = searchMetroStations(q)
+
+      let hereResults: Suggestion[] = []
+      if (apiKey) {
+        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(q)}&apiKey=${apiKey}&lang=es&limit=5&in=countryCode:CHL&types=city,area`
+        const res = await fetch(url)
+        const json = await res.json()
+        hereResults = (json.items ?? []).map((s: any) => {
+          const name = s.address.city ?? s.address.county ?? s.title
+          const isComuna = Object.keys(COMUNA_COORDS).some(c => c.toLowerCase() === name.toLowerCase())
+          return {
+            id:       s.id,
+            label:    name,
+            sublabel: s.address.state ?? s.address.label,
+            type:     isComuna ? 'comuna' as const : 'barrio' as const,
+            value:    name,
+          }
+        })
+      }
+
+      const combined = [...metroResults, ...hereResults].slice(0, 7)
+      setSuggestions(combined)
     } catch { setSuggestions([]) } finally { setLoading(false) }
   }, [apiKey])
 
@@ -71,6 +110,23 @@ function ZonaAutocomplete({ value, onChange, onSearch }: {
     else setSuggestions([])
   }
 
+  const pick = (s: Suggestion) => {
+    onChange(s.value)
+    setSuggestions([])
+  }
+
+  const iconFor = (type: Suggestion['type']) => {
+    if (type === 'metro') return <Train className="h-3.5 w-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+    if (type === 'barrio') return <MapPin className="h-3.5 w-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+    return <MapPin className="h-3.5 w-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+  }
+
+  const tagFor = (type: Suggestion['type']) => {
+    if (type === 'metro') return <span className="text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">METRO</span>
+    if (type === 'barrio') return <span className="text-[9px] font-bold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">BARRIO</span>
+    return null
+  }
+
   return (
     <div className="relative">
       <div className="relative">
@@ -78,20 +134,22 @@ function ZonaAutocomplete({ value, onChange, onSearch }: {
         <input type="text" value={value}
           onChange={e => handleInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { setSuggestions([]); onSearch() } if (e.key === 'Escape') setSuggestions([]) }}
-          placeholder="Ej: Providencia, Las Condes, Santiago..."
+          placeholder="Comuna, barrio o estación de metro..."
           className="input-field pl-9 w-full text-sm" />
         {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-gray-400" />}
       </div>
       {suggestions.length > 0 && (
         <div className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
           {suggestions.map(s => (
-            <button key={s.id} type="button"
-              onClick={() => { onChange(s.address.city ?? s.address.county ?? s.title); setSuggestions([]) }}
+            <button key={s.id} type="button" onClick={() => pick(s)}
               className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 border-b last:border-0 border-gray-100 flex items-start gap-2">
-              <MapPin className="h-3.5 w-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="font-medium text-gray-800 truncate">{s.address.city ?? s.address.county ?? s.title}</p>
-                <p className="text-xs text-gray-400 truncate">{s.address.state ?? s.address.label}</p>
+              {iconFor(s.type)}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-gray-800 truncate">{s.label}</p>
+                  {tagFor(s.type)}
+                </div>
+                <p className="text-xs text-gray-400 truncate">{s.sublabel}</p>
               </div>
             </button>
           ))}
