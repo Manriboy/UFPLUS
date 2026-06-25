@@ -95,24 +95,13 @@ export async function GET(req: NextRequest) {
     res = await fetch(TT_API, {
       method: 'POST',
       headers: {
-        'Accept':              'application/json',
-        'Accept-Language':     'es-419,es;q=0.5',
-        'Content-Type':        'application/json',
-        'User-Agent':          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
-        'Origin':              'https://www.toctoc.com',
-        'Referer':             'https://www.toctoc.com/resultados/lista/arriendo/departamento/',
-        'sec-ch-ua':           '"Chromium";v="147", "Not.A/Brand";v="8"',
-        'sec-ch-ua-mobile':    '?0',
-        'sec-ch-ua-platform':  '"macOS"',
-        'sec-fetch-dest':      'empty',
-        'sec-fetch-mode':      'cors',
-        'sec-fetch-site':      'same-origin',
-        'x-access-token':      accessRow.value,
-        'Cookie':              `X-DATA=2ee2d90d-865b-4de3-b152-b232d8b048fd; tt-jwt-gauth=${gAuthRow.value}`,
+        'Accept':          'application/json',
+        'Content-Type':    'application/json',
+        'x-access-token':  accessRow.value,
+        'Cookie':          `tt-jwt-gauth=${gAuthRow.value}`,
       },
       body: JSON.stringify(body),
       cache: 'no-store',
-      redirect: 'follow',
     })
   } catch (e: unknown) {
     const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
