@@ -101,12 +101,23 @@ export async function GET(req: NextRequest) {
       cache: 'no-store',
     })
 
+    const rawText = await res.text().catch(() => '')
+
     if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return NextResponse.json({ error: 'tt_error', detail: `HTTP ${res.status}: ${text.slice(0, 200)}` }, { status: 502 })
+      return NextResponse.json({ error: 'tt_error', detail: `HTTP ${res.status}: ${rawText.slice(0, 200)}` }, { status: 502 })
     }
 
-    const data = await res.json()
+    if (!rawText) {
+      return NextResponse.json({ error: 'empty', detail: `HTTP ${res.status} body vacío, ct: ${res.headers.get('content-type')}` }, { status: 502 })
+    }
+
+    let data: any
+    try {
+      data = JSON.parse(rawText)
+    } catch {
+      return NextResponse.json({ error: 'parse_error', detail: `Not JSON (${rawText.length}b): ${rawText.slice(0, 200)}` }, { status: 502 })
+    }
+
     const results = (data.results ?? []).map(parseResult)
     const total   = data.total ?? results.length
 
