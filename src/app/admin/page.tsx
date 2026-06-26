@@ -85,10 +85,11 @@ async function getRedirectIfDashboardDisabled(): Promise<string | null> {
 }
 
 export default async function AdminDashboard() {
-  const redirectHref = await getRedirectIfDashboardDisabled()
+  const [redirectHref, data] = await Promise.all([
+    getRedirectIfDashboardDisabled(),
+    getDashboardData(),
+  ])
   if (redirectHref) redirect(redirectHref)
-
-  const data = await getDashboardData()
 
   const statCards = [
     {

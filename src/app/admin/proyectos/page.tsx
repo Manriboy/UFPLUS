@@ -1,6 +1,7 @@
 // src/app/admin/proyectos/page.tsx
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { Plus, Building2, Home } from 'lucide-react'
 import ProjectsTable from '@/components/admin/ProjectsTable'
 import UsadosTable from '@/components/admin/UsadosTable'
@@ -40,7 +41,9 @@ export default async function AdminProjectsPage({ searchParams }: Props) {
           <p className="text-sm text-gray-500 mt-1">Gestión completa del portafolio</p>
         </div>
         <div className="flex items-center gap-5">
-          <IndicadoresWidget />
+          <Suspense fallback={<div className="h-[52px] w-[280px] bg-gray-100 rounded-lg animate-pulse" />}>
+            <IndicadoresWidget />
+          </Suspense>
           <Link
             href="/admin/proyectos/nuevo"
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dark transition-colors"
