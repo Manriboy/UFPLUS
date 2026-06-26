@@ -68,7 +68,7 @@ export const NAV_CONFIG: NavItemConfig[] = [
     href: '/admin/arriendos',
     children: [
       { key: 'arriendos.buscar', label: 'Buscador',          href: '/admin/arriendos' },
-      { key: 'arriendos.toctoc', label: 'Configurar TocToc', href: '/admin/arriendos/toctoc' },
+      { key: 'arriendos.toctoc', label: 'Sincronizar',       href: '/admin/arriendos/toctoc' },
     ],
   },
   {

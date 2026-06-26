@@ -386,6 +386,27 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+// ─── ARRIENDOS (cache TocToc) ─────────────────────────
+
+model RentalListing {
+  id         String   @id                // TocToc property ID
+  title      String?
+  commune    String?
+  address    String?
+  lat        Float?
+  lng        Float?
+  priceCLP   Int?
+  priceUF    Float?
+  area       Int?
+  bedrooms   Int?
+  bathrooms  Int?
+  thumbnail  String?
+  permalink  String?
+  syncedAt   DateTime @default(now())
+
+  @@index([commune])
+}
+
 // ─── STOCK EXTERNO UNIFICADO ──────────────────────────
 
 model CanonicalProject {

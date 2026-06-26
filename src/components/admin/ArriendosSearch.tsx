@@ -3,7 +3,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Search, MapPin, ExternalLink, BedDouble, Bath,
-  Maximize2, AlertCircle, Loader2,
+  Maximize2, AlertCircle, Loader2, Database,
   Map, LayoutGrid, RefreshCw, Train,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -287,12 +287,13 @@ export default function ArriendosSearch() {
   const [visibleBounds, setVisibleBounds] = useState<MapBounds | null>(null)
   const boundsRef = useRef<MapBounds | null>(null)
 
-  const runSearch = useCallback(async (z: string) => {
+  const runSearch = useCallback(async (commune: string) => {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ zona: z })
-      const res = await fetch(`/api/admin/arriendos?${params}`)
+      const params = commune ? new URLSearchParams({ commune }) : undefined
+      const url = `/api/admin/arriendos/db${params ? `?${params}` : ''}`
+      const res = await fetch(url)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail ?? data.error ?? `Error ${res.status}`)
@@ -300,7 +301,7 @@ export default function ArriendosSearch() {
       const data = await res.json()
       setAllResults(data.results ?? [])
       setTotal(data.total ?? 0)
-      setComunaMatch(data.comunaMatch ?? null)
+      setComunaMatch(commune || null)
       setVisibleBounds(null)
       setSearched(true)
     } catch (e: any) {
@@ -431,7 +432,18 @@ export default function ArriendosSearch() {
         <div className="flex flex-col items-center justify-center py-24 text-gray-400">
           <Search className="h-10 w-10 mb-3 opacity-30" />
           <p className="text-sm font-medium">Ingresa una comuna y presiona Buscar</p>
-          <p className="text-xs mt-1 opacity-70">Arriendos de departamentos en Región Metropolitana vía TocToc</p>
+          <p className="text-xs mt-1 opacity-70">Datos sincronizados desde TocToc · Coordenadas exactas</p>
+        </div>
+      )}
+
+      {/* Sin datos en BD */}
+      {searched && !error && allResults.length === 0 && !loading && (
+        <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+          <Database className="h-8 w-8 opacity-30" />
+          <p className="text-sm">No hay arriendos sincronizados{comunaMatch ? ` en ${comunaMatch}` : ''}</p>
+          <a href="/admin/arriendos/toctoc" className="text-xs text-brand-primary hover:underline">
+            Ir a Sincronizar Arriendos →
+          </a>
         </div>
       )}
 

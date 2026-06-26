@@ -83,7 +83,7 @@ const nav: NavItem[] = [
     icon: KeyRound, roles: STAFF,
     children: [
       { key: 'arriendos.buscar',    label: 'Buscador',        href: '/admin/arriendos',        roles: STAFF },
-      { key: 'arriendos.toctoc',    label: 'Configurar TocToc', href: '/admin/arriendos/toctoc', roles: STAFF },
+      { key: 'arriendos.toctoc',    label: 'Sincronizar',       href: '/admin/arriendos/toctoc', roles: STAFF },
     ],
   },
   {
