@@ -314,6 +314,19 @@ function TipologiaSelect({ selected, onChange }: {
 
 // ─── ProjectCard ──────────────────────────────────────
 
+// Abre links de Google con la cuenta activa del browser (authuser=0)
+function googleUrl(url: string): string {
+  if (!url) return url
+  try {
+    const u = new URL(url)
+    if (u.hostname.includes('google.com') || u.hostname.includes('googleapis.com')) {
+      if (!u.searchParams.has('authuser')) u.searchParams.set('authuser', '0')
+      return u.toString()
+    }
+  } catch {}
+  return url
+}
+
 function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCondicionesPdf }: {
   project: CanonicalProject
   onShowUnits: (p: CanonicalProject) => void
@@ -420,7 +433,7 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCo
             {ufplusEp && (ufplusEp.driveUrl || ufplusEp.stockFileUrl || ufplusEp.brochureUrl) && (
               <div className="flex gap-2 flex-wrap">
                 {ufplusEp.driveUrl && (
-                  <a href={ufplusEp.driveUrl} target="_blank" rel="noreferrer"
+                  <a href={googleUrl(ufplusEp.driveUrl)} target="_blank" rel="noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
                     onClick={e => e.stopPropagation()}
                   >
@@ -428,7 +441,7 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCo
                   </a>
                 )}
                 {ufplusEp.stockFileUrl && (
-                  <a href={ufplusEp.stockFileUrl} target="_blank" rel="noreferrer"
+                  <a href={googleUrl(ufplusEp.stockFileUrl)} target="_blank" rel="noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
                     onClick={e => e.stopPropagation()}
                   >
@@ -436,12 +449,12 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCo
                   </a>
                 )}
                 {ufplusEp.brochureUrl && (
-                  <a href={ufplusEp.brochureUrl} target="_blank" rel="noreferrer"
+                  <button
                     className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
-                    onClick={e => e.stopPropagation()}
+                    onClick={e => { e.stopPropagation(); onShowCondicionesPdf(ufplusEp.brochureUrl!, project.name) }}
                   >
                     <FileText className="h-3.5 w-3.5" /> Brochure
-                  </a>
+                  </button>
                 )}
               </div>
             )}
@@ -451,7 +464,7 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCo
               <div className="flex gap-2">
                 {broukEp.driveUrl && (
                   <a
-                    href={broukEp.driveUrl} target="_blank" rel="noreferrer"
+                    href={googleUrl(broukEp.driveUrl)} target="_blank" rel="noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
                     onClick={e => e.stopPropagation()}
                   >
@@ -460,7 +473,7 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCo
                 )}
                 {broukEp.stockFileUrl && (
                   <a
-                    href={broukEp.stockFileUrl} target="_blank" rel="noreferrer"
+                    href={googleUrl(broukEp.stockFileUrl)} target="_blank" rel="noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
                     onClick={e => e.stopPropagation()}
                   >
@@ -1024,9 +1037,9 @@ function PdfModal({ url, title, onClose }: { url: string; title: string; onClose
           </div>
         </div>
         <iframe
-          src={url}
+          src={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
           className="flex-1 w-full border-0"
-          title={`Condiciones comerciales — ${title}`}
+          title={`PDF — ${title}`}
         />
       </div>
     </div>

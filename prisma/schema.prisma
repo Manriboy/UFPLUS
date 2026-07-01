@@ -169,6 +169,8 @@ model Project {
   commune         String?
   city            String?
   region          String?
+  lat             Float?
+  lng             Float?
 
   metaTitle       String?
   metaDescription String?
