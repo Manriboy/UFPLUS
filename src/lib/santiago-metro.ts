@@ -2,14 +2,23 @@
 // Fuente: mapa oficial Metro de Santiago + coordenadas OSM.
 // Orden de estaciones: según recorrido oficial de cada línea.
 
-export type MetroLine = 'L1' | 'L2' | 'L3' | 'L4' | 'L4A' | 'L5' | 'L6'
+export type MetroLine       = 'L1' | 'L2' | 'L3' | 'L4' | 'L4A' | 'L5' | 'L6'
+export type MetroLineFuture = 'L7' | 'L8' | 'L9' | 'L6-EXT'
+export type AnyMetroLine    = MetroLine | MetroLineFuture
 
 export type MetroStation = {
   name: string
   line: MetroLine
   lat: number
   lng: number
-  transfers?: MetroLine[]   // líneas con que combina en esta estación
+  transfers?: MetroLine[]
+}
+
+export type FutureMetroStation = {
+  name: string
+  line: MetroLineFuture
+  lat: number
+  lng: number
 }
 
 export const METRO_LINE_COLORS: Record<MetroLine, string> = {
@@ -20,6 +29,13 @@ export const METRO_LINE_COLORS: Record<MetroLine, string> = {
   L4A: '#5B9BD5',
   L5:  '#3F9A3C',
   L6:  '#8A2BE2',
+}
+
+export const FUTURE_LINE_COLORS: Record<MetroLineFuture, string> = {
+  'L7':    '#96989A',
+  'L8':    '#FF6414',
+  'L9':    '#EE7FA9',
+  'L6-EXT':'#8E2A8B',
 }
 
 // ── Polylines en orden oficial ────────────────────────
@@ -343,3 +359,98 @@ export const METRO_STATIONS: MetroStation[] = [
   { line: 'L6', name: 'Inés de Suárez',         lat: -33.43872, lng: -70.60734 },
   { line: 'L6', name: 'Los Leones',             lat: -33.42202, lng: -70.60856, transfers: ['L1'] },
 ]
+
+// ── Estaciones futuras ────────────────────────────────
+// Fuente: UFPLUS_HERE_metro_futuro_IA.json
+
+export const FUTURE_METRO_STATIONS: FutureMetroStation[] = [
+  // ── L7 (Renca → Estoril) ────────────────────────────
+  { line: 'L7', name: 'Brasil',             lat: -33.3995759, lng: -70.7468143 },
+  { line: 'L7', name: 'José Miguel Infante',lat: -33.4057077, lng: -70.7455486 },
+  { line: 'L7', name: 'Salvador Gutiérrez', lat: -33.4147,    lng: -70.74465   },
+  { line: 'L7', name: 'Huelén',             lat: -33.42313,   lng: -70.74013   },
+  { line: 'L7', name: 'Neptuno',            lat: -33.4240677, lng: -70.7185269 },
+  { line: 'L7', name: 'Radal',              lat: -33.428463,  lng: -70.7040032 },
+  { line: 'L7', name: 'Walker Martínez',    lat: -33.4315281, lng: -70.6924074 },
+  { line: 'L7', name: 'Matucana',           lat: -33.43209,   lng: -70.6807    },
+  { line: 'L7', name: 'Cumming',            lat: -33.4325,    lng: -70.66908   },
+  { line: 'L7', name: 'Puente Cal y Canto', lat: -33.43284,   lng: -70.65308   },
+  { line: 'L7', name: 'Baquedano',          lat: -33.43722,   lng: -70.63341   },
+  { line: 'L7', name: 'Pedro de Valdivia',  lat: -33.42504,   lng: -70.61313   },
+  { line: 'L7', name: 'Isidora Goyenechea', lat: -33.41395,   lng: -70.60013   },
+  { line: 'L7', name: 'Vitacura',           lat: -33.40546,   lng: -70.5967    },
+  { line: 'L7', name: 'Américo Vespucio',   lat: -33.39931,   lng: -70.5862    },
+  { line: 'L7', name: 'Parque Araucano',    lat: -33.401,     lng: -70.57378   },
+  { line: 'L7', name: 'Gerónimo de Alderete',lat:-33.40176,   lng: -70.56018   },
+  { line: 'L7', name: 'Padre Hurtado',      lat: -33.4016,    lng: -70.54828   },
+  { line: 'L7', name: 'Estoril',            lat: -33.40257,   lng: -70.53686   },
+  // ── L8 (Los Leones → Mall Plaza Tobalaba) ───────────
+  { line: 'L8', name: 'Los Leones',         lat: -33.42202,   lng: -70.60944   },
+  { line: 'L8', name: 'Eliodoro Yáñez',     lat: -33.43145,   lng: -70.60683   },
+  { line: 'L8', name: 'Diagonal Oriente',   lat: -33.4431,    lng: -70.5974    },
+  { line: 'L8', name: 'Chile-España',        lat: -33.45491,   lng: -70.59814   },
+  { line: 'L8', name: 'Grecia',             lat: -33.46648,   lng: -70.5981    },
+  { line: 'L8', name: 'Rodrigo de Araya',   lat: -33.47667,   lng: -70.59843   },
+  { line: 'L8', name: 'Quilín',             lat: -33.48888,   lng: -70.59895   },
+  { line: 'L8', name: 'Doctor Amador Neghme',lat:-33.50123,   lng: -70.60031   },
+  { line: 'L8', name: 'Macul',              lat: -33.51582,   lng: -70.59813   },
+  { line: 'L8', name: 'Walker Martínez',    lat: -33.52429,   lng: -70.59714   },
+  { line: 'L8', name: 'Rojas Magallanes',   lat: -33.5357,    lng: -70.59692   },
+  { line: 'L8', name: 'Trinidad',           lat: -33.54693,   lng: -70.59685   },
+  { line: 'L8', name: 'Diego Portales',     lat: -33.56795,   lng: -70.58355   },
+  { line: 'L8', name: 'Mall Plaza Tobalaba',lat: -33.58289,   lng: -70.57622   },
+  // ── L9 (Puente Cal y Canto → Plaza de Puente Alto) ──
+  { line: 'L9', name: 'Puente Cal y Canto', lat: -33.43068,   lng: -70.64727   },
+  { line: 'L9', name: 'Santa Lucía',        lat: -33.44214,   lng: -70.64413   },
+  { line: 'L9', name: 'Matta',              lat: -33.45127,   lng: -70.64042   },
+  { line: 'L9', name: 'Ñuble',              lat: -33.46364,   lng: -70.63577   },
+  { line: 'L9', name: 'Bío Bío',            lat: -33.47557,   lng: -70.63088   },
+  { line: 'L9', name: 'La Legua–Pedro Alarcón',lat:-33.48572, lng: -70.62674   },
+  { line: 'L9', name: 'La Legua',           lat: -33.49608,   lng: -70.62271   },
+  { line: 'L9', name: 'Departamental',      lat: -33.5082,    lng: -70.61782   },
+  { line: 'L9', name: 'Lo Ovalle',          lat: -33.51885,   lng: -70.61342   },
+  { line: 'L9', name: 'Linares',            lat: -33.52742,   lng: -70.60994   },
+  { line: 'L9', name: 'Santa Rosa',         lat: -33.53821,   lng: -70.60517   },
+  { line: 'L9', name: 'Hospital Padre Hurtado',lat:-33.54894, lng: -70.60084   },
+  { line: 'L9', name: 'Observatorio',       lat: -33.56093,   lng: -70.5962    },
+  { line: 'L9', name: 'Plaza La Pintana',   lat: -33.57472,   lng: -70.59094   },
+  { line: 'L9', name: 'La Primavera',       lat: -33.58633,   lng: -70.5865    },
+  { line: 'L9', name: 'Eyzaguirre',         lat: -33.59913,   lng: -70.58114   },
+  { line: 'L9', name: 'Juanita',            lat: -33.6042,    lng: -70.5871    },
+  { line: 'L9', name: 'Ejército',           lat: -33.60735,   lng: -70.5802    },
+  { line: 'L9', name: 'Plaza de Puente Alto',lat:-33.61195,   lng: -70.57585   },
+  // ── L6-EXT ──────────────────────────────────────────
+  { line: 'L6-EXT', name: 'Lo Errázuriz',   lat: -33.4905,    lng: -70.7228056 },
+]
+
+// ── Polylines futuras ─────────────────────────────────
+export const FUTURE_METRO_POLYLINES: Record<MetroLineFuture, [number, number][]> = {
+  'L7': [
+    [-33.3995759,-70.7468143],[-33.4057077,-70.7455486],[-33.4147,-70.74465],
+    [-33.42313,-70.74013],[-33.4240677,-70.7185269],[-33.428463,-70.7040032],
+    [-33.4315281,-70.6924074],[-33.43209,-70.6807],[-33.4325,-70.66908],
+    [-33.43284,-70.65308],[-33.43722,-70.63341],[-33.42504,-70.61313],
+    [-33.41395,-70.60013],[-33.40546,-70.5967],[-33.39931,-70.5862],
+    [-33.401,-70.57378],[-33.40176,-70.56018],[-33.4016,-70.54828],
+    [-33.40257,-70.53686],
+  ],
+  'L8': [
+    [-33.42202,-70.60944],[-33.43145,-70.60683],[-33.4431,-70.5974],
+    [-33.45491,-70.59814],[-33.46648,-70.5981],[-33.47667,-70.59843],
+    [-33.48888,-70.59895],[-33.50123,-70.60031],[-33.51582,-70.59813],
+    [-33.52429,-70.59714],[-33.5357,-70.59692],[-33.54693,-70.59685],
+    [-33.56795,-70.58355],[-33.58289,-70.57622],
+  ],
+  'L9': [
+    [-33.43068,-70.64727],[-33.44214,-70.64413],[-33.45127,-70.64042],
+    [-33.46364,-70.63577],[-33.47557,-70.63088],[-33.48572,-70.62674],
+    [-33.49608,-70.62271],[-33.5082,-70.61782],[-33.51885,-70.61342],
+    [-33.52742,-70.60994],[-33.53821,-70.60517],[-33.54894,-70.60084],
+    [-33.56093,-70.5962],[-33.57472,-70.59094],[-33.58633,-70.5865],
+    [-33.59913,-70.58114],[-33.6042,-70.5871],[-33.60735,-70.5802],
+    [-33.61195,-70.57585],
+  ],
+  'L6-EXT': [
+    [-33.4905,-70.7228056],
+  ],
+}

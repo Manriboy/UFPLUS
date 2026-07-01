@@ -4,7 +4,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Maximize2, Minimize2 } from 'lucide-react'
 import type { Map as LMap, Marker as LMarker, CircleMarker as LCircleMarker } from 'leaflet'
-import { METRO_STATIONS, METRO_LINE_COLORS, METRO_POLYLINES, type MetroLine } from '@/lib/santiago-metro'
+import {
+  METRO_STATIONS, METRO_LINE_COLORS, METRO_POLYLINES, type MetroLine,
+  FUTURE_METRO_STATIONS, FUTURE_LINE_COLORS, FUTURE_METRO_POLYLINES, type MetroLineFuture,
+} from '@/lib/santiago-metro'
 import { cn } from '@/lib/utils'
 
 export interface MapProject {
@@ -65,7 +68,9 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
   const mapRef = useRef<LMap | null>(null)
   const markersRef = useRef<Map<string, LMarker>>(new Map())
   const metroMarkersRef = useRef<LCircleMarker[]>([])
-  const metroLinesRef = useRef<import('leaflet').Polyline[]>([])
+  const metroLinesRef   = useRef<import('leaflet').Polyline[]>([])
+  const futureMarkersRef= useRef<LCircleMarker[]>([])
+  const futureLinesRef  = useRef<import('leaflet').Polyline[]>([])
   const onSelectRef = useRef(onSelect)
   const onBoundsChangeRef = useRef(onBoundsChange)
   const wheelCleanupRef = useRef<(() => void) | null>(null)
@@ -74,6 +79,7 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
   const [hint, setHint] = useState(false)
   const [showStations, setShowStations] = useState(true)
   const [showLines, setShowLines] = useState(true)
+  const [showFutureLines, setShowFutureLines] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   onSelectRef.current = onSelect
@@ -174,6 +180,9 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
           const { markers, lines } = addMetroLayer(L, map)
           metroMarkersRef.current = markers
           metroLinesRef.current = lines
+          const { markers: fm, lines: fl } = addFutureMetroLayer(L, map)
+          futureMarkersRef.current = fm
+          futureLinesRef.current = fl
         }
       }, 100)
     })
@@ -188,6 +197,8 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
         markersRef.current.clear()
         metroMarkersRef.current = []
         metroLinesRef.current = []
+        futureMarkersRef.current = []
+        futureLinesRef.current = []
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,6 +228,14 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
     const visible = showStations || showLines
     metroMarkersRef.current.forEach(m => { if (visible) m.addTo(map); else m.remove() })
   }, [showStations, showLines])
+
+  // Visibilidad de líneas y estaciones futuras
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    futureLinesRef.current.forEach(l => { if (showFutureLines) l.addTo(map); else l.remove() })
+    futureMarkersRef.current.forEach(m => { if (showFutureLines) m.addTo(map); else m.remove() })
+  }, [showFutureLines])
 
   // Sincronizar estado y tamaño del mapa con la API nativa de fullscreen
   useEffect(() => {
@@ -284,7 +303,7 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
           <span>Est.</span>
         </button>
 
-        {/* Líneas */}
+        {/* Líneas actuales */}
         <button
           onClick={toggleLines}
           title={showLines ? 'Ocultar líneas de metro' : 'Mostrar líneas de metro'}
@@ -302,6 +321,23 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
           <span>Líneas</span>
         </button>
 
+        {/* Líneas futuras */}
+        <button
+          onClick={() => setShowFutureLines(v => !v)}
+          title={showFutureLines ? 'Ocultar líneas futuras' : 'Mostrar líneas futuras'}
+          className={cn(
+            'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold shadow-md transition-colors select-none',
+            showFutureLines
+              ? 'bg-gray-500 text-white'
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50',
+          )}
+        >
+          <svg width="12" height="10" viewBox="0 0 12 10" fill="none" className="flex-shrink-0">
+            <path d="M1 9L4 2L7.5 6.5L10 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 2"/>
+          </svg>
+          <span>Futuras</span>
+        </button>
+
         {/* Pantalla completa */}
         <button
           onClick={toggleFullscreen}
@@ -316,12 +352,19 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
       </div>
 
       {/* Leyenda líneas */}
-      {showLines && (
+      {(showLines || showFutureLines) && (
         <div className="absolute bottom-6 left-2 z-[1000] bg-white/90 backdrop-blur-sm rounded-lg shadow-md px-2.5 py-2 space-y-1">
-          {(['L1','L2','L3','L4','L5','L6'] as const).map(line => (
+          {showLines && (['L1','L2','L3','L4','L5','L6'] as const).map(line => (
             <div key={line} className="flex items-center gap-1.5">
               <span className="inline-block w-3 h-3 rounded-full border border-white/60 shadow-sm" style={{ background: METRO_LINE_COLORS[line] }} />
               <span className="text-[10px] font-semibold text-gray-700">{line}</span>
+            </div>
+          ))}
+          {showLines && showFutureLines && <div className="border-t border-gray-200 my-0.5" />}
+          {showFutureLines && (['L7','L8','L9','L6-EXT'] as const).map(line => (
+            <div key={line} className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-3 h-3 rounded-full border-2" style={{ borderColor: FUTURE_LINE_COLORS[line], background: 'white' }} />
+              <span className="text-[10px] font-semibold text-gray-500">{line} <span className="font-normal opacity-70">(futuro)</span></span>
             </div>
           ))}
         </div>
@@ -366,6 +409,44 @@ function addMetroLayer(L: typeof import('leaflet'), map: LMap): {
     })
       .addTo(map)
       .bindTooltip(`${station.name} · ${station.line}`, { direction: 'top', offset: [0, -6] })
+    markers.push(marker)
+  }
+
+  return { markers, lines }
+}
+
+// ── Líneas futuras de metro ───────────────────────────
+
+function addFutureMetroLayer(L: typeof import('leaflet'), map: LMap): {
+  markers: LCircleMarker[]
+  lines: import('leaflet').Polyline[]
+} {
+  const lines: import('leaflet').Polyline[] = []
+  const markers: LCircleMarker[] = []
+
+  for (const [line, points] of Object.entries(FUTURE_METRO_POLYLINES) as [string, [number, number][]][]) {
+    if (points.length < 2) continue
+    const color = FUTURE_LINE_COLORS[line as MetroLineFuture]
+    const polyline = L.polyline(points, {
+      color,
+      weight: 3,
+      opacity: 0.75,
+      dashArray: '8, 8',
+    }).addTo(map)
+    lines.push(polyline)
+  }
+
+  for (const station of FUTURE_METRO_STATIONS) {
+    const color = FUTURE_LINE_COLORS[station.line]
+    const marker = L.circleMarker([station.lat, station.lng], {
+      radius: 5,
+      color,
+      weight: 2,
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+    })
+      .addTo(map)
+      .bindTooltip(`${station.name} · ${station.line} (futuro)`, { direction: 'top', offset: [0, -6] })
     markers.push(marker)
   }
 
