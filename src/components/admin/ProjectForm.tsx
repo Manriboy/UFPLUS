@@ -61,17 +61,35 @@ function PdfUploadField({ label, currentUrl, currentPubId, onUpload, onClear }: 
 
   const handleFile = async (file: File) => {
     if (file.type !== 'application/pdf') { toast('Solo se permiten archivos PDF', 'error'); return }
+    if (file.size > 30 * 1024 * 1024) { toast('El PDF no puede superar 30MB', 'error'); return }
     setUploading(true)
     try {
+      // 1. Obtener firma del servidor (petición pequeña, sin archivo)
+      const signRes = await fetch('/api/admin/upload/pdf')
+      if (!signRes.ok) { const e = await signRes.json(); throw new Error(e.error ?? 'Error al firmar') }
+      const { cloudName, apiKey, timestamp, folder, signature } = await signRes.json()
+
+      // 2. Subir directamente a Cloudinary desde el browser (sin pasar por Vercel)
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch('/api/admin/upload/pdf', { method: 'POST', body: fd })
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? 'Error al subir') }
-      const data = await res.json()
-      onUpload(data.url, data.publicId)
+      fd.append('api_key', apiKey)
+      fd.append('timestamp', timestamp)
+      fd.append('folder', folder)
+      fd.append('signature', signature)
+
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`,
+        { method: 'POST', body: fd }
+      )
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}))
+        throw new Error(err.error?.message ?? 'Error al subir a Cloudinary')
+      }
+      const data = await uploadRes.json()
+      onUpload(data.secure_url, data.public_id)
       toast('PDF subido correctamente', 'success')
     } catch (e: any) {
-      toast(e.message, 'error')
+      toast(e.message ?? 'Error al subir PDF', 'error')
     } finally { setUploading(false) }
   }
 
