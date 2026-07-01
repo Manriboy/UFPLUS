@@ -176,6 +176,11 @@ model Project {
   videoUrl        String?
   videoType       VideoType?
 
+  linkDrive       String?       // Link a carpeta Google Drive
+  linkStock       String?       // Link a Google Sheets de stock
+  brochureUrl     String?       // URL del PDF brochure (Cloudinary)
+  brochurePubId   String?       // Cloudinary public ID del brochure
+
   publishedAt     DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

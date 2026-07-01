@@ -95,12 +95,14 @@ const SOURCE_LABELS: Record<string, string> = {
   jetbrokers: 'GCP',
   brouk: 'Drive',
   iris: 'AWS',
+  ufplus: 'Directo',
 }
 
 const SOURCE_COLORS: Record<string, string> = {
   jetbrokers: 'bg-sky-400 text-white',
   brouk: 'bg-blue-600 text-white',
   iris: 'bg-orange-500 text-white',
+  ufplus: 'bg-[#941914] text-white',
 }
 
 // Mapeo de todos los valores de stage existentes en BD
@@ -324,6 +326,7 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCo
   const irisEp         = project.externalProjects.find(ep => ep.source === 'iris')
   const broukEp        = project.externalProjects.find(ep => ep.source === 'brouk')
   const jbEp           = project.externalProjects.find(ep => ep.source === 'jetbrokers')
+  const ufplusEp       = project.externalProjects.find(ep => ep.source === 'ufplus')
   const hasUnits       = !!(irisEp || jbEp)
   const hasCondiciones = !!(jbEp?.notesHtml || irisEp?.paymentMethodsHtml)
 
@@ -410,8 +413,38 @@ function ExternalProjectCard({ project, onShowUnits, onShowCondiciones, onShowCo
         )}
 
         {/* Acciones por fuente */}
-        {(broukEp || irisEp?.condicionesUrl || hasUnits || hasCondiciones) && (
+        {(broukEp || ufplusEp || irisEp?.condicionesUrl || hasUnits || hasCondiciones) && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col gap-2">
+
+            {/* UFPlus interno: Drive + Stock + Brochure */}
+            {ufplusEp && (ufplusEp.driveUrl || ufplusEp.stockFileUrl || ufplusEp.brochureUrl) && (
+              <div className="flex gap-2 flex-wrap">
+                {ufplusEp.driveUrl && (
+                  <a href={ufplusEp.driveUrl} target="_blank" rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" /> Drive
+                  </a>
+                )}
+                {ufplusEp.stockFileUrl && (
+                  <a href={ufplusEp.stockFileUrl} target="_blank" rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <FileText className="h-3.5 w-3.5" /> Stock
+                  </a>
+                )}
+                {ufplusEp.brochureUrl && (
+                  <a href={ufplusEp.brochureUrl} target="_blank" rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <FileText className="h-3.5 w-3.5" /> Brochure
+                  </a>
+                )}
+              </div>
+            )}
 
             {/* Brouk: Drive + Ver Stock */}
             {broukEp && (broukEp.driveUrl || broukEp.stockFileUrl) && (
@@ -1015,9 +1048,10 @@ export default function ExternalStockSearch() {
   const [tipologias, setTipologias] = useState<string[]>([])
   const [bonoPieMin, setBonoPieMin] = useState('')
   const [priceRange, setPriceRange] = useState<[number, number]>([0, PRICE_MAX])
-  const [srcAws, setSrcAws] = useState(true)
-  const [srcDrive, setSrcDrive] = useState(true)
-  const [srcGcp, setSrcGcp] = useState(true)
+  const [srcAws, setSrcAws]       = useState(true)
+  const [srcDrive, setSrcDrive]   = useState(true)
+  const [srcGcp, setSrcGcp]       = useState(true)
+  const [srcUfplus, setSrcUfplus] = useState(true)
   const [delivery, setDelivery] = useState<'' | 'immediate' | 'future'>('')
 
   const handlePriceInput = (side: 'min' | 'max', raw: string) => {
@@ -1080,15 +1114,16 @@ export default function ExternalStockSearch() {
     if (priceRange[1] < PRICE_MAX) filter.priceMax = priceRange[1]
 
     const sources = [
-      ...(srcAws   ? ['iris']        : []),
-      ...(srcDrive ? ['brouk']       : []),
-      ...(srcGcp   ? ['jetbrokers']  : []),
+      ...(srcAws    ? ['iris']       : []),
+      ...(srcDrive  ? ['brouk']      : []),
+      ...(srcGcp    ? ['jetbrokers'] : []),
+      ...(srcUfplus ? ['ufplus']     : []),
     ]
-    if (sources.length < 3) filter.sources = sources
+    if (sources.length < 4) filter.sources = sources
     if (delivery) filter.delivery = delivery
 
     return filter
-  }, [q, selectedRegion, zoneIds, tipologias, bonoPieMin, priceRange, srcAws, srcDrive, srcGcp, delivery])
+  }, [q, selectedRegion, zoneIds, tipologias, bonoPieMin, priceRange, srcAws, srcDrive, srcGcp, srcUfplus, delivery])
 
   const search = useCallback(async () => {
     if (!canSearch) return
@@ -1154,6 +1189,7 @@ export default function ExternalStockSearch() {
     setSrcAws(true)
     setSrcDrive(true)
     setSrcGcp(true)
+    setSrcUfplus(true)
     setDelivery('')
   }
 
@@ -1167,9 +1203,10 @@ export default function ExternalStockSearch() {
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fuentes:</span>
         {([
-          { key: 'aws',   label: 'AWS',   value: srcAws,   set: setSrcAws,   color: 'bg-orange-500' },
-          { key: 'drive', label: 'Drive',  value: srcDrive, set: setSrcDrive, color: 'bg-blue-600' },
-          { key: 'gcp',   label: 'GCP',   value: srcGcp,   set: setSrcGcp,   color: 'bg-sky-400' },
+          { key: 'ufplus', label: 'Directo', value: srcUfplus, set: setSrcUfplus, color: 'bg-[#941914]' },
+          { key: 'aws',    label: 'AWS',    value: srcAws,    set: setSrcAws,    color: 'bg-orange-500' },
+          { key: 'drive',  label: 'Drive',  value: srcDrive,  set: setSrcDrive,  color: 'bg-blue-600' },
+          { key: 'gcp',    label: 'GCP',    value: srcGcp,    set: setSrcGcp,    color: 'bg-sky-400' },
         ] as const).map(src => (
           <button
             key={src.key}

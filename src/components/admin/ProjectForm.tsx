@@ -1,6 +1,6 @@
 'use client'
 // src/components/admin/ProjectForm.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,7 +9,7 @@ import { slugify } from '@/lib/utils'
 import { toast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import { Input, Textarea, Select, Toggle } from '@/components/ui/Input'
-import { Plus, Trash2, ChevronDown, ChevronUp, Save, GripVertical } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Save, GripVertical, FileText, Upload, X, ExternalLink } from 'lucide-react'
 
 interface Props {
   project?: any
@@ -48,6 +48,66 @@ const COMMON_FINANCING = [
   'Inversión con renta garantizada',
   'Subsidio habitacional',
 ]
+
+function PdfUploadField({ label, currentUrl, currentPubId, onUpload, onClear }: {
+  label: string
+  currentUrl?: string
+  currentPubId?: string
+  onUpload: (url: string, pubId: string) => void
+  onClear: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  const handleFile = async (file: File) => {
+    if (file.type !== 'application/pdf') { toast('Solo se permiten archivos PDF', 'error'); return }
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/upload/pdf', { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? 'Error al subir') }
+      const data = await res.json()
+      onUpload(data.url, data.publicId)
+      toast('PDF subido correctamente', 'success')
+    } catch (e: any) {
+      toast(e.message, 'error')
+    } finally { setUploading(false) }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      {currentUrl ? (
+        <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <FileText className="h-5 w-5 text-brand-primary flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-700 truncate">Brochure subido</p>
+            <a href={currentUrl} target="_blank" rel="noopener noreferrer"
+              className="text-xs text-brand-primary hover:underline flex items-center gap-1">
+              Ver PDF <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <button type="button" onClick={onClear}
+            className="p-1 hover:bg-gray-200 rounded transition-colors">
+            <X className="h-4 w-4 text-gray-500" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-brand-primary hover:text-brand-primary transition-colors disabled:opacity-50"
+        >
+          {uploading ? <><div className="h-4 w-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" /> Subiendo...</> : <><Upload className="h-4 w-4" /> Seleccionar PDF (máx. 20MB)</>}
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept=".pdf,application/pdf" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
+    </div>
+  )
+}
 
 function SectionCard({ title, children, defaultOpen = true }: {
   title: string; children: React.ReactNode; defaultOpen?: boolean
@@ -542,6 +602,48 @@ export default function ProjectForm({ project }: Props) {
             {...register('metaDescription')}
             placeholder="Descripción para motores de búsqueda (max 155 chars)"
             hint={`${watch('metaDescription')?.length || 0}/155 caracteres`}
+          />
+        </div>
+      </SectionCard>
+
+      {/* ─── LINKS Y DOCUMENTOS ─────────────────────────── */}
+      <SectionCard title="Links y documentos" defaultOpen={false}>
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500">
+            Estos campos son exclusivos para proyectos internos y se muestran en el buscador de Stock UFPLUS.
+          </p>
+
+          <Input
+            label="Link Drive"
+            {...register('linkDrive')}
+            placeholder="https://drive.google.com/..."
+            hint="Carpeta de Google Drive del proyecto"
+            error={errors.linkDrive?.message}
+            type="url"
+          />
+
+          <Input
+            label="Link Stock"
+            {...register('linkStock')}
+            placeholder="https://docs.google.com/spreadsheets/..."
+            hint="Google Sheets con el inventario de unidades"
+            error={errors.linkStock?.message}
+            type="url"
+          />
+
+          {/* PDF Brochure */}
+          <PdfUploadField
+            label="Brochure (PDF)"
+            currentUrl={watch('brochureUrl') ?? undefined}
+            currentPubId={watch('brochurePubId') ?? undefined}
+            onUpload={(url, pubId) => {
+              setValue('brochureUrl', url)
+              setValue('brochurePubId', pubId)
+            }}
+            onClear={() => {
+              setValue('brochureUrl', null)
+              setValue('brochurePubId', null)
+            }}
           />
         </div>
       </SectionCard>
