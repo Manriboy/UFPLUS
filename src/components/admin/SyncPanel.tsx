@@ -2,7 +2,6 @@
 // src/components/admin/SyncPanel.tsx
 import { useState, useCallback, useEffect } from 'react'
 import { RefreshCw, CheckCircle2, XCircle, Zap, Sun, CalendarDays, AlertTriangle, KeyRound } from 'lucide-react'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 type SyncStatus = 'idle' | 'running' | 'done' | 'error'
@@ -173,57 +172,141 @@ function SyncAllButton({
   )
 }
 
-// ── Token status banner ───────────────────────────────────
+// ── Token status + renovación inline ─────────────────────
 
 type TokenStatus = { hasToken: boolean; status: string; daysLeft: number | null; expiresAt: string | null }
 
-function BroukTokenBanner() {
-  const [status, setStatus] = useState<TokenStatus | null>(null)
+function BroukTokenPanel() {
+  const [status, setStatus]       = useState<TokenStatus | null>(null)
+  const [token, setToken]         = useState('')
+  const [saving, setSaving]       = useState(false)
+  const [saved, setSaved]         = useState(false)
+  const [showForm, setShowForm]   = useState(false)
 
-  useEffect(() => {
+  const loadStatus = () => {
     fetch('/api/admin/brouk/token-status')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setStatus(d) })
       .catch(() => {})
-  }, [])
+  }
+
+  useEffect(() => { loadStatus() }, [])
 
   if (!status) return null
-  if (status.status === 'valid' && (status.daysLeft === null || status.daysLeft > 7)) return null
 
   const isExpired = status.status === 'expired' || !status.hasToken || (status.daysLeft !== null && status.daysLeft < 0)
   const isWarning = !isExpired && status.daysLeft !== null && status.daysLeft <= 7
+  const isOk      = !isExpired && !isWarning
 
-  if (!isExpired && !isWarning) return null
+  // Si está OK y no queremos mostrarlo, no renderizamos nada
+  if (isOk && !showForm) return null
 
   const expDate = status.expiresAt
     ? new Date(status.expiresAt).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : null
 
+  const handleSave = async () => {
+    if (!token.trim() || token.trim().length < 20) return
+    setSaving(true)
+    setSaved(false)
+    try {
+      const res = await fetch('/api/admin/brouk/refresh-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token.trim() }),
+      })
+      if (res.ok) {
+        setSaved(true)
+        setToken('')
+        setShowForm(false)
+        // Re-check status after saving
+        await fetch('/api/admin/brouk/token-status').then(r => r.json()).then(d => setStatus(d)).catch(() => {})
+      }
+    } finally { setSaving(false) }
+  }
+
+  const bgClass  = isExpired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+  const txtClass = isExpired ? 'text-red-800' : 'text-amber-800'
+  const subClass = isExpired ? 'text-red-600' : 'text-amber-700'
+  const btnClass = isExpired ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'
+
   return (
-    <div className={cn(
-      'flex items-start gap-3 rounded-lg px-4 py-3 text-sm mb-4',
-      isExpired ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-amber-50 border border-amber-200 text-amber-700'
-    )}>
-      {isExpired ? <KeyRound className="h-4 w-4 flex-shrink-0 mt-0.5" /> : <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />}
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold">
-          {isExpired ? 'Token de Drive (Brouk) expirado' : `Token de Drive expira en ${status.daysLeft} días`}
-        </p>
-        <p className="text-xs mt-0.5 opacity-80">
-          {isExpired
-            ? 'El sync de Drive fallará hasta que actualices el token.'
-            : `Vence el ${expDate}. Actualízalo antes de que expire para evitar interrupciones.`}
-        </p>
+    <div className={cn('rounded-lg border p-4 mb-4 space-y-3', bgClass)}>
+      {/* Header */}
+      <div className="flex items-start gap-2.5">
+        {isExpired
+          ? <KeyRound className={cn('h-4 w-4 flex-shrink-0 mt-0.5', txtClass)} />
+          : <AlertTriangle className={cn('h-4 w-4 flex-shrink-0 mt-0.5', txtClass)} />}
+        <div className="flex-1 min-w-0">
+          <p className={cn('text-sm font-semibold', txtClass)}>
+            {isExpired ? 'Token de Drive (Brouk) expirado' : `Token de Drive expira en ${status.daysLeft} días${expDate ? ` (${expDate})` : ''}`}
+          </p>
+          <p className={cn('text-xs mt-0.5', subClass)}>
+            {isExpired
+              ? 'El sync de Drive fallará hasta renovarlo. Sigue las instrucciones:'
+              : 'Renuévalo antes de que expire para evitar interrupciones.'}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          className={cn('flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors', btnClass)}
+        >
+          {showForm ? 'Cancelar' : 'Renovar token'}
+        </button>
       </div>
-      <Link
-        href="/admin/stock-unificado"
-        className={cn(
-          'flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors',
-          isExpired ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-amber-600 text-white hover:bg-amber-700'
-        )}
-      >
-        Actualizar
-      </Link>
+
+      {/* Formulario de renovación */}
+      {(isExpired || showForm) && (
+        <div className="space-y-3">
+          <ol className={cn('text-xs space-y-1 list-decimal list-inside', subClass)}>
+            <li>
+              Ve a{' '}
+              <a
+                href="https://www.ufplus.cl/stock-offline"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline"
+              >
+                www.ufplus.cl/stock-offline
+              </a>
+              {' '}e inicia sesión con tu cuenta Google de UFPlus
+            </li>
+            <li>Abre DevTools: tecla <kbd className="bg-white/60 border border-current/30 rounded px-1 font-mono">F12</kbd></li>
+            <li>
+              Pestaña <strong>Application</strong> → <strong>Cookies</strong> →{' '}
+              <code className="bg-white/60 rounded px-1">www.ufplus.cl</code>
+            </li>
+            <li>Copia el valor completo de la cookie <strong>jwtToken</strong></li>
+            <li>Pégalo abajo y guarda</li>
+          </ol>
+
+          <div className="flex gap-2">
+            <textarea
+              value={token}
+              onChange={e => setToken(e.target.value)}
+              placeholder="Pega aquí el valor de jwtToken…"
+              rows={2}
+              className="flex-1 text-xs font-mono resize-none rounded-md border border-current/20 bg-white/70 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-current/40"
+            />
+            <button
+              onClick={handleSave}
+              disabled={saving || token.trim().length < 20}
+              className={cn(
+                'flex-shrink-0 px-4 text-xs font-semibold rounded-md transition-colors disabled:opacity-50',
+                btnClass
+              )}
+            >
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+
+          {saved && (
+            <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Token actualizado. Ya puedes sincronizar.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -248,7 +331,7 @@ export default function SyncPanel() {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5">
-      <BroukTokenBanner />
+      <BroukTokenPanel />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
