@@ -44,7 +44,7 @@ const SOURCE_COLORS: Record<string, string> = {
 
 // ── Lógica de streaming SSE ───────────────────────────────
 
-function useSyncRunner() {
+function useSyncRunner(onDone?: () => void) {
   const allKeys: AnyKey[] = [
     ...DAILY_SOURCES.map(s => s.key),
     ...WEEKLY_SOURCES.map(s => s.key),
@@ -64,7 +64,7 @@ function useSyncRunner() {
         try {
           const d = JSON.parse(e.data) as { progress: number; message: string; done?: boolean; error?: boolean }
           if (d.error) { update(key, { status: 'error', progress: 0, message: d.message }); es.close(); resolve(); return }
-          if (d.done)  { update(key, { status: 'done', progress: 100, message: d.message }); es.close(); resolve(); return }
+          if (d.done)  { update(key, { status: 'done', progress: 100, message: d.message }); es.close(); onDone?.(); resolve(); return }
           update(key, { progress: Math.max(0, d.progress), message: d.message })
         } catch {}
       }
@@ -333,17 +333,20 @@ function BroukTokenPanel() {
 
 export default function SyncPanel() {
   const [open, setOpen] = useState(false)
-  const { states, runSource } = useSyncRunner()
   const [timestamps, setTimestamps] = useState<Record<TsKey, string | null>>({
     'iris-daily': null, 'iris': null, 'brouk': null,
   })
 
-  useEffect(() => {
+  const reloadTimestamps = useCallback(() => {
     fetch('/api/admin/sync/timestamps')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setTimestamps(d) })
       .catch(() => {})
   }, [])
+
+  useEffect(() => { reloadTimestamps() }, [reloadTimestamps])
+
+  const { states, runSource } = useSyncRunner(reloadTimestamps)
 
   const dailyRunning = DAILY_SOURCES.some(s => states[s.key].status === 'running')
   const weeklyRunning = WEEKLY_SOURCES.some(s => states[s.key].status === 'running')

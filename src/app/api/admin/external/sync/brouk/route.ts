@@ -195,7 +195,15 @@ export async function GET() {
       }
       try {
         const result = await runSync(send)
-        await recordSyncTimestamp('brouk')
+        await Promise.all([
+          recordSyncTimestamp('brouk'),
+          // Sync exitoso → token válido, borrar estado de expirado
+          prisma.setting.upsert({
+            where:  { key: 'brouk_token_status' },
+            update: { value: 'valid' },
+            create: { key: 'brouk_token_status', value: 'valid' },
+          }),
+        ])
         send(100, `Listo · ${result.totalProjects} proyectos · ${result.newProjects} nuevos`, { done: true, result })
       } catch (e) {
         send(-1, e instanceof Error ? e.message : 'Error desconocido', { error: true })

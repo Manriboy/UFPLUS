@@ -30,15 +30,23 @@ export async function GET() {
     return NextResponse.json({ hasToken: false, status: 'no_token', daysLeft: null, expiresAt: null })
   }
 
-  // Decodificar JWT para obtener expiración real
+  // Intentar decodificar JWT para expiración exacta (puede ser token opaco → null)
   const exp      = decodeJwtExp(token)
   const now      = Math.floor(Date.now() / 1000)
   const daysLeft = exp ? Math.floor((exp - now) / 86400) : null
   const isExpiredByJwt = daysLeft !== null && daysLeft < 0
 
-  // El estado real: primero JWT (exacto), si no hay exp usamos el resultado del cron
-  const status = isExpiredByJwt ? 'expired'
-    : (daysLeft !== null ? 'valid' : (dbStatus ?? 'unknown'))
+  // Prioridad: JWT (si disponible) > dbStatus (del cron/sync) > unknown
+  let status: string
+  if (isExpiredByJwt) {
+    status = 'expired'
+  } else if (daysLeft !== null) {
+    // JWT decodificable y no expirado → válido
+    status = 'valid'
+  } else {
+    // Token opaco: confiar en el último resultado del cron o del sync
+    status = dbStatus ?? 'unknown'
+  }
 
   return NextResponse.json({
     hasToken:  true,
