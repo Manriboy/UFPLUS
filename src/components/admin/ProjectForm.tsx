@@ -166,7 +166,8 @@ export default function ProjectForm({ project }: Props) {
       ? {
           name: project.name,
           slug: project.slug,
-          internalCode: project.internalCode ?? '',
+          internalCode:  project.internalCode  ?? '',
+          developerName: project.developerName ?? '',
           isActive: project.isActive,
           isFeatured: project.isFeatured,
           isArchived: project.isArchived,
@@ -265,6 +266,13 @@ export default function ProjectForm({ project }: Props) {
               {...register('name')}
               error={errors.name?.message}
               placeholder="Ej: Parque Independencia"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Input
+              label="Nombre de inmobiliaria"
+              {...register('developerName')}
+              placeholder="Ej: Inmobiliaria Los Andes"
             />
           </div>
           <div>

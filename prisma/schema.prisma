@@ -165,6 +165,8 @@ model Project {
   longDescription  String?     @db.Text
   ctaText         String?
 
+  developerName   String?
+
   address         String?
   commune         String?
   city            String?

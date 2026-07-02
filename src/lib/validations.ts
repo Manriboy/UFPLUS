@@ -46,6 +46,7 @@ export const projectSchema = z.object({
   shortDescription: z.string().optional().nullable(),
   longDescription: z.string().optional().nullable(),
   ctaText: z.string().optional().nullable(),
+  developerName: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   commune: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
