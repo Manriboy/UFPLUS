@@ -385,43 +385,42 @@ export const FUTURE_METRO_STATIONS: FutureMetroStation[] = [
   { line: 'L7', name: 'Padre Hurtado',      lat: -33.4016,    lng: -70.54828   },
   { line: 'L7', name: 'Estoril',            lat: -33.40257,   lng: -70.53686   },
   // ── L8 (Los Leones → Mall Plaza Tobalaba) ───────────
-  { line: 'L8', name: 'Los Leones',         lat: -33.4248,    lng: -70.60805   }, // Av. Los Leones con Colipi
-  { line: 'L8', name: 'Eliodoro Yáñez',     lat: -33.43145,   lng: -70.60683   },
+  { line: 'L8', name: 'Los Leones',         lat: -33.42202,   lng: -70.60856   }, // mismo que L1/L6
+  { line: 'L8', name: 'Eliodoro Yáñez',     lat: -33.4316,    lng: -70.6063    }, // Av. Los Leones con Eliodoro Yáñez
   { line: 'L8', name: 'Diagonal Oriente',   lat: -33.4431,    lng: -70.5997    },
-  { line: 'L8', name: 'Chile España',        lat: -33.45491,   lng: -70.59814   },
-  { line: 'L8', name: 'Grecia',             lat: -33.46648,   lng: -70.5981    },
-  { line: 'L8', name: 'Rodrigo de Araya',   lat: -33.47667,   lng: -70.59843   },
-  { line: 'L8', name: 'Quilín',             lat: -33.48888,   lng: -70.59895   },
-  { line: 'L8', name: 'Las Torres',         lat: -33.50123,   lng: -70.60031   },
-  { line: 'L8', name: 'Macul',              lat: -33.51582,   lng: -70.59813   },
-  { line: 'L8', name: 'Walker Martínez',    lat: -33.52429,   lng: -70.59714   },
-  { line: 'L8', name: 'Rojas Magallanes',   lat: -33.5357,    lng: -70.59692   },
-  { line: 'L8', name: 'Trinidad',           lat: -33.54693,   lng: -70.59685   },
-  { line: 'L8', name: 'Portales',           lat: -33.56795,   lng: -70.58355   },
-  { line: 'L8', name: 'Mall Plaza Tobalaba',lat: -33.58289,   lng: -70.57622   },
+  { line: 'L8', name: 'Chile España',        lat: -33.45491,   lng: -70.59814   }, // mismo que L3
+  { line: 'L8', name: 'Grecia',             lat: -33.4665,    lng: -70.5966    }, // Av. José Pedro Alessandri con Grecia
+  { line: 'L8', name: 'Rodrigo de Araya',   lat: -33.4773,    lng: -70.5972    }, // Av. José Pedro Alessandri con Rodrigo de Araya
+  { line: 'L8', name: 'Quilín',             lat: -33.48888,   lng: -70.59895   }, // Av. Macul con Quilín
+  { line: 'L8', name: 'Las Torres',         lat: -33.5012,    lng: -70.5990    }, // Av. Macul con Dr. Amador Neghme
+  { line: 'L8', name: 'Macul',              lat: -33.51582,   lng: -70.59813   }, // Av. La Florida con Vespucio
+  { line: 'L8', name: 'Walker Martínez',    lat: -33.5241,    lng: -70.5970    }, // Av. La Florida con Walker Martínez
+  { line: 'L8', name: 'Rojas Magallanes',   lat: -33.5357,    lng: -70.5969    }, // Av. La Florida con Rojas Magallanes
+  { line: 'L8', name: 'Trinidad',           lat: -33.5468,    lng: -70.5967    }, // Av. La Florida con Trinidad Oriente
+  { line: 'L8', name: 'Portales',           lat: -33.5679,    lng: -70.5833    }, // Av. Camilo Henríquez con Diego Portales
+  { line: 'L8', name: 'Mall Plaza Tobalaba',lat: -33.5829,    lng: -70.5762    }, // Av. Camilo Henríquez con Cerro Punta Negra
   // ── L9 (Puente Cal y Canto → Plaza de Puente Alto) ──
-  // Eje corregido: sigue Av. Santa Rosa; gira al oriente desde Eyzaguirre
-  { line: 'L9', name: 'Puente Cal y Canto', lat: -33.43068,   lng: -70.64727   },
+  { line: 'L9', name: 'Puente Cal y Canto', lat: -33.43284,   lng: -70.65308   }, // mismo que L2/L3/L7
   { line: 'L9', name: 'Santa Lucía',        lat: -33.44214,   lng: -70.64413   },
-  { line: 'L9', name: 'Matta',              lat: -33.45127,   lng: -70.6417    },
-  { line: 'L9', name: 'Ñuble',              lat: -33.4629,    lng: -70.6382    },
-  { line: 'L9', name: 'Bío Bío',            lat: -33.4746,    lng: -70.6363    },
-  { line: 'L9', name: 'La Legua-Pedro Alarcón', lat: -33.4855, lng: -70.6355   },
-  { line: 'L9', name: 'La Legua',           lat: -33.4971,    lng: -70.6349    },
-  { line: 'L9', name: 'Departamental',      lat: -33.5079,    lng: -70.6345    },
-  { line: 'L9', name: 'Lo Ovalle',          lat: -33.519,     lng: -70.6343    },
-  { line: 'L9', name: 'Linares',            lat: -33.5278,    lng: -70.6342    },
-  { line: 'L9', name: 'Santa Rosa',         lat: -33.54239,   lng: -70.63413   },
-  { line: 'L9', name: 'Hospital Padre Hurtado', lat: -33.5486, lng: -70.6337   },
-  { line: 'L9', name: 'Observatorio',       lat: -33.5609,    lng: -70.6331    },
-  { line: 'L9', name: 'Plaza La Pintana',   lat: -33.5751,    lng: -70.6324    },
-  { line: 'L9', name: 'La Primavera',       lat: -33.5863,    lng: -70.6317    },
-  { line: 'L9', name: 'Eyzaguirre',         lat: -33.5991,    lng: -70.6311    },
-  { line: 'L9', name: 'Juanita',            lat: -33.6049,    lng: -70.6108    }, // gira al oriente por Sargento Menadier
-  { line: 'L9', name: 'Ejército',           lat: -33.60735,   lng: -70.5802    },
-  { line: 'L9', name: 'Plaza de Puente Alto',lat:-33.61195,   lng: -70.57585   },
+  { line: 'L9', name: 'Matta',              lat: -33.45127,   lng: -70.6417    }, // Av. Santa Rosa con Matta
+  { line: 'L9', name: 'Ñuble',              lat: -33.4629,    lng: -70.6382    }, // Av. Santa Rosa con Ñuble
+  { line: 'L9', name: 'Bío Bío',            lat: -33.4746,    lng: -70.6363    }, // Av. Santa Rosa con Centenario
+  { line: 'L9', name: 'La Legua-Pedro Alarcón', lat: -33.4855, lng: -70.6355   }, // Av. Santa Rosa con Pedro Alarcón
+  { line: 'L9', name: 'La Legua',           lat: -33.4971,    lng: -70.6349    }, // Av. Santa Rosa con Salvador Allende
+  { line: 'L9', name: 'Departamental',      lat: -33.5079,    lng: -70.6345    }, // Av. Santa Rosa con Departamental
+  { line: 'L9', name: 'Lo Ovalle',          lat: -33.519,     lng: -70.6343    }, // Av. Santa Rosa con Lo Ovalle
+  { line: 'L9', name: 'Linares',            lat: -33.5278,    lng: -70.6342    }, // Av. Santa Rosa con Linares
+  { line: 'L9', name: 'Santa Rosa',         lat: -33.54239,   lng: -70.63413   }, // Av. Santa Rosa con Vespucio
+  { line: 'L9', name: 'Hospital Padre Hurtado', lat: -33.5486, lng: -70.6337   }, // Av. Santa Rosa con Esperanza
+  { line: 'L9', name: 'Observatorio',       lat: -33.5609,    lng: -70.6331    }, // Av. Santa Rosa con Observatorio
+  { line: 'L9', name: 'Plaza La Pintana',   lat: -33.5751,    lng: -70.6324    }, // Av. Santa Rosa con Baldomero Lillo
+  { line: 'L9', name: 'La Primavera',       lat: -33.5863,    lng: -70.6317    }, // Av. Santa Rosa con La Primavera
+  { line: 'L9', name: 'Eyzaguirre',         lat: -33.5991,    lng: -70.6311    }, // Av. Santa Rosa con Eyzaguirre → gira al oriente
+  { line: 'L9', name: 'Juanita',            lat: -33.6047,    lng: -70.6070    }, // Av. Sargento Menadier con Juanita
+  { line: 'L9', name: 'Ejército',           lat: -33.6073,    lng: -70.5920    }, // Av. Sargento Menadier con Ejército Libertador
+  { line: 'L9', name: 'Plaza de Puente Alto',lat:-33.60952,   lng: -70.57584   }, // mismo que L4
   // ── L6-EXT ──────────────────────────────────────────
-  { line: 'L6-EXT', name: 'Lo Errázuriz',   lat: -33.4905,    lng: -70.7228056 },
+  { line: 'L6-EXT', name: 'Lo Errázuriz',   lat: -33.4905,    lng: -70.7228056 }, // Av. Costanera Norte Ferrocarril con Lo Errázuriz
 ]
 
 // ── Polylines futuras ─────────────────────────────────
@@ -436,23 +435,26 @@ export const FUTURE_METRO_POLYLINES: Record<MetroLineFuture, [number, number][]>
     [-33.40257,-70.53686],
   ],
   'L8': [
-    [-33.4248,-70.60805],[-33.43145,-70.60683],[-33.4431,-70.5997],
-    [-33.45491,-70.59814],[-33.46648,-70.5981],[-33.47667,-70.59843],
-    [-33.48888,-70.59895],[-33.50123,-70.60031],[-33.51582,-70.59813],
-    [-33.52429,-70.59714],[-33.5357,-70.59692],[-33.54693,-70.59685],
-    [-33.56795,-70.58355],[-33.58289,-70.57622],
+    [-33.42202,-70.60856],[-33.4316,-70.6063],[-33.4431,-70.5997],
+    [-33.45491,-70.59814],[-33.4665,-70.5966],[-33.4773,-70.5972],
+    [-33.48888,-70.59895],[-33.5012,-70.5990],[-33.51582,-70.59813],
+    [-33.5241,-70.5970],[-33.5357,-70.5969],[-33.5468,-70.5967],
+    [-33.5679,-70.5833],[-33.5829,-70.5762],
   ],
   'L9': [
-    [-33.43068,-70.64727],[-33.44214,-70.64413],[-33.45127,-70.6417],
+    [-33.43284,-70.65308],  // Puente Cal y Canto (mismo L2/L3/L7)
+    [-33.44214,-70.64413],[-33.45127,-70.6417],
     [-33.4629,-70.6382],[-33.4746,-70.6363],[-33.4855,-70.6355],
     [-33.4971,-70.6349],[-33.5079,-70.6345],[-33.519,-70.6343],
     [-33.5278,-70.6342],[-33.54239,-70.63413],[-33.5486,-70.6337],
     [-33.5609,-70.6331],[-33.5751,-70.6324],[-33.5863,-70.6317],
-    [-33.5991,-70.6311],[-33.6049,-70.6108],[-33.60735,-70.5802],
-    [-33.61195,-70.57585],
+    [-33.5991,-70.6311],  // Eyzaguirre → giro al oriente
+    [-33.6047,-70.6070],  // Juanita (Sargento Menadier)
+    [-33.6073,-70.5920],  // Ejército Libertador
+    [-33.60952,-70.57584], // Plaza de Puente Alto (mismo L4)
   ],
   'L6-EXT': [
-    [-33.5007,-70.7095],  // Cerrillos existente (punto de conexión)
-    [-33.4905,-70.7228056],
+    [-33.48343,-70.69556], // Cerrillos (estación existente L6)
+    [-33.4905,-70.7228056], // Lo Errázuriz
   ],
 }

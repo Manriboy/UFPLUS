@@ -382,6 +382,41 @@ export default function ProjectMap({ projects, selectedId, onSelect, onBoundsCha
   )
 }
 
+// ── Orden de líneas para tooltip y prioridad de color ────
+const LINE_ORDER = ['L1','L2','L3','L4','L4A','L5','L6','L6-EXT','L7','L8','L9']
+const sortLines = (lines: string[]) =>
+  Array.from(new Set(lines)).sort((a, b) => LINE_ORDER.indexOf(a) - LINE_ORDER.indexOf(b))
+
+type StationGroup = {
+  name: string; lat: number; lng: number
+  lines: string[]
+  hasExisting: boolean // true si al menos una línea es actual (L1-L6)
+}
+
+function buildStationGroups(): StationGroup[] {
+  const groups: StationGroup[] = []
+  const EXISTING_LINES = Object.keys(METRO_LINE_COLORS)
+
+  const nearby = (a: {lat:number,lng:number}, b: {lat:number,lng:number}) =>
+    Math.abs(a.lat - b.lat) < 0.003 && Math.abs(a.lng - b.lng) < 0.003
+
+  const addToGroup = (name: string, lat: number, lng: number, line: string) => {
+    const g = groups.find(g => g.name.toLowerCase() === name.toLowerCase() && nearby(g, {lat, lng}))
+    if (g) {
+      if (!g.lines.includes(line)) g.lines.push(line)
+      if (EXISTING_LINES.includes(line)) g.hasExisting = true
+    } else {
+      groups.push({ name, lat, lng, lines: [line], hasExisting: EXISTING_LINES.includes(line) })
+    }
+  }
+
+  for (const s of METRO_STATIONS)        addToGroup(s.name, s.lat, s.lng, s.line)
+  for (const s of FUTURE_METRO_STATIONS) addToGroup(s.name, s.lat, s.lng, s.line)
+
+  groups.forEach(g => { g.lines = sortLines(g.lines) })
+  return groups
+}
+
 // ── Estaciones de metro ───────────────────────────────
 
 function addMetroLayer(L: typeof import('leaflet'), map: LMap): {
@@ -393,22 +428,25 @@ function addMetroLayer(L: typeof import('leaflet'), map: LMap): {
 
   for (const [line, points] of Object.entries(METRO_POLYLINES) as [string, [number, number][]][]) {
     if (points.length < 2) continue
-    const color = METRO_LINE_COLORS[line as MetroLine]
-    const polyline = L.polyline(points, { color, weight: 2.5, opacity: 0.85 }).addTo(map)
+    const polyline = L.polyline(points, {
+      color: METRO_LINE_COLORS[line as MetroLine],
+      weight: 2.5, opacity: 0.85,
+    }).addTo(map)
     lines.push(polyline)
   }
 
-  for (const station of METRO_STATIONS) {
-    const color = METRO_LINE_COLORS[station.line]
-    const marker = L.circleMarker([station.lat, station.lng], {
-      radius: 5,
-      color: '#fff',
-      weight: 1.5,
-      fillColor: color,
+  // Renderizar marcadores de estaciones existentes con tooltips combinados
+  const groups = buildStationGroups()
+  for (const g of groups.filter(g => g.hasExisting)) {
+    const firstExisting = g.lines.find(l => METRO_LINE_COLORS[l as MetroLine]) as MetroLine
+    const allLines = g.lines.join(' · ')
+    const marker = L.circleMarker([g.lat, g.lng], {
+      radius: 5, color: '#fff', weight: 1.5,
+      fillColor: METRO_LINE_COLORS[firstExisting],
       fillOpacity: 1,
     })
       .addTo(map)
-      .bindTooltip(`${station.name} · ${station.line}`, { direction: 'top', offset: [0, -6] })
+      .bindTooltip(`${g.name} · ${allLines}`, { direction: 'top', offset: [0, -6] })
     markers.push(marker)
   }
 
@@ -426,27 +464,26 @@ function addFutureMetroLayer(L: typeof import('leaflet'), map: LMap): {
 
   for (const [line, points] of Object.entries(FUTURE_METRO_POLYLINES) as [string, [number, number][]][]) {
     if (points.length < 2) continue
-    const color = FUTURE_LINE_COLORS[line as MetroLineFuture]
     const polyline = L.polyline(points, {
-      color,
-      weight: 3,
-      opacity: 0.75,
-      dashArray: '8, 8',
+      color: FUTURE_LINE_COLORS[line as MetroLineFuture],
+      weight: 3, opacity: 0.75, dashArray: '8, 8',
     }).addTo(map)
     lines.push(polyline)
   }
 
-  for (const station of FUTURE_METRO_STATIONS) {
-    const color = FUTURE_LINE_COLORS[station.line]
-    const marker = L.circleMarker([station.lat, station.lng], {
+  // Solo renderizar marcadores de estaciones EXCLUSIVAMENTE futuras
+  // (las compartidas con existentes ya aparecen en addMetroLayer)
+  const groups = buildStationGroups()
+  for (const g of groups.filter(g => !g.hasExisting)) {
+    const firstFuture = g.lines[0] as MetroLineFuture
+    const allLines = g.lines.join(' · ')
+    const marker = L.circleMarker([g.lat, g.lng], {
       radius: 5,
-      color,
-      weight: 2,
-      fillColor: '#ffffff',
-      fillOpacity: 1,
+      color: FUTURE_LINE_COLORS[firstFuture],
+      weight: 2, fillColor: '#ffffff', fillOpacity: 1,
     })
       .addTo(map)
-      .bindTooltip(`${station.name} · ${station.line} (futuro)`, { direction: 'top', offset: [0, -6] })
+      .bindTooltip(`${g.name} · ${allLines}`, { direction: 'top', offset: [0, -6] })
     markers.push(marker)
   }
 
