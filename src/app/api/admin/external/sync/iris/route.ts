@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { recordSyncTimestamp } from '@/lib/sync-timestamps'
 import { refreshIrisToken } from '@/lib/iris-token'
 import { assignAndMergeCanonical, fixDuplicateSourceMerges } from '@/lib/canonical-merge'
 
@@ -262,6 +263,7 @@ export async function GET() {
 
       try {
         const result = await runSync(send)
+        await recordSyncTimestamp('iris')
         send(100, `Listo · ${result.unitsSynced} unidades · ${result.newProjects} nuevos`, { done: true, result })
       } catch (e) {
         send(-1, e instanceof Error ? e.message : 'Error desconocido', { error: true })

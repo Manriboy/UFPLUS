@@ -12,18 +12,30 @@ const INITIAL: SyncState = { status: 'idle', progress: 0, message: '' }
 // ── Definición de fuentes por sección ────────────────────
 
 const DAILY_SOURCES = [
-  { key: 'iris-daily',  label: 'AWS',   description: 'Token + unidades y precios', url: '/api/admin/external/sync/iris/daily' },
-  { key: 'brouk-daily', label: 'Drive', description: 'Renueva links de imágenes',  url: '/api/admin/external/sync/brouk' },
+  { key: 'iris-daily',  label: 'AWS',   description: 'Token + unidades y precios', url: '/api/admin/external/sync/iris/daily', tsKey: 'iris-daily' },
+  { key: 'brouk-daily', label: 'Drive', description: 'Renueva links de imágenes',  url: '/api/admin/external/sync/brouk',       tsKey: 'brouk' },
 ] as const
 
 const WEEKLY_SOURCES = [
-  { key: 'iris',  label: 'AWS',   description: 'Proyectos + unidades completo', url: '/api/admin/external/sync/iris' },
-  { key: 'brouk', label: 'Drive', description: 'Proyectos completo',            url: '/api/admin/external/sync/brouk' },
+  { key: 'iris',  label: 'AWS',   description: 'Proyectos + unidades completo', url: '/api/admin/external/sync/iris',  tsKey: 'iris' },
+  { key: 'brouk', label: 'Drive', description: 'Proyectos completo',            url: '/api/admin/external/sync/brouk', tsKey: 'brouk' },
 ] as const
 
 type DailyKey = typeof DAILY_SOURCES[number]['key']
 type WeeklyKey = typeof WEEKLY_SOURCES[number]['key']
 type AnyKey = DailyKey | WeeklyKey
+type TsKey = 'iris-daily' | 'iris' | 'brouk'
+
+function fmtTs(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  const now = new Date()
+  const diffH = (now.getTime() - d.getTime()) / 3_600_000
+  if (diffH < 1) return 'hace menos de 1 hora'
+  if (diffH < 24) return `hace ${Math.floor(diffH)} h`
+  if (diffH < 48) return 'ayer'
+  return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 
 const SOURCE_COLORS: Record<string, string> = {
   AWS: 'bg-orange-500 text-white',
@@ -66,7 +78,7 @@ function useSyncRunner() {
 // ── Tarjeta individual ────────────────────────────────────
 
 function SyncCard({
-  label, description, srcKey, url, running: allRunning, state, onRun,
+  label, description, srcKey, url, running: allRunning, state, onRun, lastSync,
 }: {
   label: string
   description: string
@@ -75,6 +87,7 @@ function SyncCard({
   running: boolean
   state: SyncState
   onRun: (key: AnyKey, url: string) => void
+  lastSync: string | null
 }) {
   const running = state.status === 'running'
   const disabled = allRunning
@@ -113,7 +126,12 @@ function SyncCard({
       )}
 
       {!showBar && state.status === 'idle' && (
-        <p className="text-xs text-gray-300">Sin sincronizar</p>
+        <p className="text-xs text-gray-400">
+          {lastSync ? `Última vez: ${fmtTs(lastSync)}` : 'Sin sincronizar'}
+        </p>
+      )}
+      {!showBar && state.status === 'done' && lastSync && (
+        <p className="text-xs text-gray-400">Última vez: {fmtTs(lastSync)}</p>
       )}
 
       <button
@@ -316,6 +334,16 @@ function BroukTokenPanel() {
 export default function SyncPanel() {
   const [open, setOpen] = useState(false)
   const { states, runSource } = useSyncRunner()
+  const [timestamps, setTimestamps] = useState<Record<TsKey, string | null>>({
+    'iris-daily': null, 'iris': null, 'brouk': null,
+  })
+
+  useEffect(() => {
+    fetch('/api/admin/sync/timestamps')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setTimestamps(d) })
+      .catch(() => {})
+  }, [])
 
   const dailyRunning = DAILY_SOURCES.some(s => states[s.key].status === 'running')
   const weeklyRunning = WEEKLY_SOURCES.some(s => states[s.key].status === 'running')
@@ -386,6 +414,7 @@ export default function SyncPanel() {
                   running={anyRunning}
                   state={states[s.key]}
                   onRun={runSource}
+                  lastSync={timestamps[s.tsKey as TsKey]}
                 />
               ))}
             </div>
@@ -423,6 +452,7 @@ export default function SyncPanel() {
                   running={anyRunning}
                   state={states[s.key]}
                   onRun={runSource}
+                  lastSync={timestamps[s.tsKey as TsKey]}
                 />
               ))}
             </div>

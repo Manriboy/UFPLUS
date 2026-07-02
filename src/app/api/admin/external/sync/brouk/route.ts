@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { assignAndMergeCanonical } from '@/lib/canonical-merge'
+import { recordSyncTimestamp } from '@/lib/sync-timestamps'
 
 const APP_ID = 'e4f62324-96a7-44cd-9cb1-3350520dc92e'
 const BROUK_BASE = `https://www.brouk.cl/v1/datasource/applications/${APP_ID}`
@@ -194,6 +195,7 @@ export async function GET() {
       }
       try {
         const result = await runSync(send)
+        await recordSyncTimestamp('brouk')
         send(100, `Listo · ${result.totalProjects} proyectos · ${result.newProjects} nuevos`, { done: true, result })
       } catch (e) {
         send(-1, e instanceof Error ? e.message : 'Error desconocido', { error: true })

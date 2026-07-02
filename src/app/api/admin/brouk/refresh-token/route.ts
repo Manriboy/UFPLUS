@@ -1,4 +1,3 @@
-// src/app/api/admin/brouk/refresh-token/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -13,11 +12,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Token inválido' }, { status: 400 })
   }
 
-  await prisma.setting.upsert({
-    where: { key: 'brouk_token' },
-    update: { value: token.trim() },
-    create: { key: 'brouk_token', value: token.trim() },
-  })
+  await Promise.all([
+    prisma.setting.upsert({
+      where:  { key: 'brouk_token' },
+      update: { value: token.trim() },
+      create: { key: 'brouk_token', value: token.trim() },
+    }),
+    // Resetear el status para que el banner desaparezca inmediatamente
+    prisma.setting.upsert({
+      where:  { key: 'brouk_token_status' },
+      update: { value: 'valid' },
+      create: { key: 'brouk_token_status', value: 'valid' },
+    }),
+  ])
 
   return NextResponse.json({ success: true })
 }

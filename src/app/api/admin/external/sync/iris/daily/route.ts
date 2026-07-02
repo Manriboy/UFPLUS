@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { refreshIrisToken } from '@/lib/iris-token'
 import prisma from '@/lib/prisma'
 import { assignAndMergeCanonical } from '@/lib/canonical-merge'
+import { recordSyncTimestamp } from '@/lib/sync-timestamps'
 
 const IRIS_SEARCH_URL = 'https://iris-auth.infocasas.com.uy/api/projects/get-projects-search'
 const PAGE_SIZE = 50
@@ -186,6 +187,7 @@ export async function GET() {
           send(Math.min(pct, 95), `Unidades (${processed}/${allProjects.length} proyectos)...`)
         }, 8)
 
+        await recordSyncTimestamp('iris-daily')
         send(100, `Listo · ${unitsSynced} unidades · ${allProjects.length} proyectos`, { done: true })
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Error desconocido'
