@@ -1,7 +1,8 @@
 'use client'
 // src/components/admin/SyncPanel.tsx
-import { useState, useCallback } from 'react'
-import { RefreshCw, CheckCircle2, XCircle, Zap, Sun, CalendarDays } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { RefreshCw, CheckCircle2, XCircle, Zap, Sun, CalendarDays, AlertTriangle, KeyRound } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 type SyncStatus = 'idle' | 'running' | 'done' | 'error'
@@ -172,6 +173,61 @@ function SyncAllButton({
   )
 }
 
+// ── Token status banner ───────────────────────────────────
+
+type TokenStatus = { hasToken: boolean; status: string; daysLeft: number | null; expiresAt: string | null }
+
+function BroukTokenBanner() {
+  const [status, setStatus] = useState<TokenStatus | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/brouk/token-status')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setStatus(d) })
+      .catch(() => {})
+  }, [])
+
+  if (!status) return null
+  if (status.status === 'valid' && (status.daysLeft === null || status.daysLeft > 7)) return null
+
+  const isExpired = status.status === 'expired' || !status.hasToken || (status.daysLeft !== null && status.daysLeft < 0)
+  const isWarning = !isExpired && status.daysLeft !== null && status.daysLeft <= 7
+
+  if (!isExpired && !isWarning) return null
+
+  const expDate = status.expiresAt
+    ? new Date(status.expiresAt).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null
+
+  return (
+    <div className={cn(
+      'flex items-start gap-3 rounded-lg px-4 py-3 text-sm mb-4',
+      isExpired ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-amber-50 border border-amber-200 text-amber-700'
+    )}>
+      {isExpired ? <KeyRound className="h-4 w-4 flex-shrink-0 mt-0.5" /> : <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />}
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold">
+          {isExpired ? 'Token de Drive (Brouk) expirado' : `Token de Drive expira en ${status.daysLeft} días`}
+        </p>
+        <p className="text-xs mt-0.5 opacity-80">
+          {isExpired
+            ? 'El sync de Drive fallará hasta que actualices el token.'
+            : `Vence el ${expDate}. Actualízalo antes de que expire para evitar interrupciones.`}
+        </p>
+      </div>
+      <Link
+        href="/admin/stock-unificado"
+        className={cn(
+          'flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors',
+          isExpired ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-amber-600 text-white hover:bg-amber-700'
+        )}
+      >
+        Actualizar
+      </Link>
+    </div>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────
 
 export default function SyncPanel() {
@@ -192,6 +248,7 @@ export default function SyncPanel() {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <BroukTokenBanner />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/iris-refresh",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/brouk-check",
+      "schedule": "0 8 * * *"
     }
   ]
 }
