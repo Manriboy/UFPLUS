@@ -239,7 +239,7 @@ function BroukTokenPanel() {
           : <AlertTriangle className={cn('h-4 w-4 flex-shrink-0 mt-0.5', txtClass)} />}
         <div className="flex-1 min-w-0">
           <p className={cn('text-sm font-semibold', txtClass)}>
-            {isExpired ? 'Token de Drive (Brouk) expirado' : `Token de Drive expira en ${status.daysLeft} días${expDate ? ` (${expDate})` : ''}`}
+            {isExpired ? 'Token de Drive expirado' : `Token de Drive expira en ${status.daysLeft} días${expDate ? ` (${expDate})` : ''}`}
           </p>
           <p className={cn('text-xs mt-0.5', subClass)}>
             {isExpired
